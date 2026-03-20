@@ -6,167 +6,165 @@
 <title>Fleet Card Manager</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500;600;700&display=swap');
-:root{--navy:#0B1E3D;--navy2:#142952;--blue:#0369A1;--accent:#F59E0B;--green:#10B981;--red:#EF4444;--orange:#F97316;--bg:#F0F4FA;--card:#fff;--border:#DDE5F0;--text:#0B1E3D;--muted:#7A90B0;}
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=Roboto+Mono:wght@400;500;600;700&display=swap');
+:root{
+  --navy:#0C3547;--navy2:#164E63;--blue:#0369A1;--accent:#F59E0B;
+  --green:#059669;--red:#DC2626;--orange:#EA580C;
+  --bg:#F0F6FA;--card:#fff;--border:#D1E4EE;--text:#0C3547;--muted:#6B8FA3;
+  --shadow:0 2px 12px rgba(12,53,71,.08);--shadow-md:0 4px 20px rgba(12,53,71,.14);
+}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;max-width:480px;margin:0 auto;}
-.topbar{background:linear-gradient(135deg,#0369A1,#0C4A6E);padding:14px 16px 11px;position:sticky;top:0;z-index:100;box-shadow:0 4px 20px rgba(3,105,161,.3);}
-.brand-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;max-width:500px;margin:0 auto;}
+.topbar{background:linear-gradient(135deg,var(--navy),var(--navy2));padding:13px 15px 0;position:sticky;top:0;z-index:100;box-shadow:var(--shadow-md);}
+.top-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;}
 .brand{display:flex;align-items:center;gap:9px;}
-.brand-icon{width:34px;height:34px;border-radius:9px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:var(--navy);flex-shrink:0;}
-.brand-texts .brand-name{font-size:15px;font-weight:700;color:#fff;line-height:1.2;}
-.brand-texts .brand-sub{font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;}
-.tabs{display:flex;gap:3px;background:rgba(255,255,255,.09);border-radius:11px;padding:3px;}
-.tab{flex:1;text-align:center;padding:8px 4px;border-radius:8px;font-size:11px;font-weight:700;color:rgba(255,255,255,.5);cursor:pointer;transition:all .2s;text-transform:uppercase;}
-.tab.active{background:var(--accent);color:var(--navy);}
-.page{display:none;padding:16px 15px 110px;animation:fi .22s ease;}
+.brand-icon{width:36px;height:36px;border-radius:10px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.brand-name{font-size:16px;font-weight:800;color:#fff;}
+.brand-sub{font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;}
+.sync-pill{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;color:#fff;display:flex;align-items:center;gap:5px;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
+.sync-dot.live{background:var(--green);}.sync-dot.err{background:var(--red);}
+.tabs{display:flex;gap:2px;padding:0 1px;}
+.tab{flex:1;text-align:center;padding:9px 3px;font-size:10px;font-weight:700;color:rgba(255,255,255,.5);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;text-transform:uppercase;letter-spacing:.3px;}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.page{display:none;padding:15px 13px 100px;animation:fi .2s ease;}
 .page.active{display:block;}
-@keyframes fi{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
-.card{background:var(--card);border-radius:16px;box-shadow:0 4px 20px rgba(11,30,61,.08);padding:18px;margin-bottom:13px;border:1px solid var(--border);}
-.card-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:15px;display:flex;align-items:center;gap:6px;}
-label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px;}
-select,input[type=date],input[type=number],input[type=text],input[type=password]{width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--border);font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text);background:#F8FAFD;outline:none;transition:border .2s,box-shadow .2s;-webkit-appearance:none;appearance:none;}
-select:focus,input:focus{border-color:var(--blue);background:#fff;box-shadow:0 0 0 3px rgba(3,105,161,.1);}
-select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237A90B0' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:36px;}
-.form-row{margin-bottom:14px;}.form-row-2{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:14px;}
-.btn{width:100%;padding:14px;border-radius:11px;border:none;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .17s;}
-.btn-primary{background:linear-gradient(135deg,#0369A1,#0C4A6E);color:#fff;}
-.btn-accent{background:linear-gradient(135deg,var(--accent),#FBBF24);color:var(--navy);}
-.btn-green{background:linear-gradient(135deg,var(--green),#059669);color:#fff;}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.card{background:var(--card);border-radius:15px;box-shadow:var(--shadow);padding:16px;margin-bottom:12px;border:1px solid var(--border);}
+.card-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:13px;display:flex;align-items:center;gap:6px;}
+label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px;}
+select,input[type=date],input[type=number],input[type=text],input[type=password]{
+  width:100%;padding:11px 13px;border-radius:10px;border:1.5px solid var(--border);
+  font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);background:#F8FBFD;
+  outline:none;transition:border .2s,box-shadow .2s;-webkit-appearance:none;appearance:none;
+}
+input:focus,select:focus{border-color:var(--blue);background:#fff;box-shadow:0 0 0 3px rgba(3,105,161,.08);}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B8FA3' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:36px;}
+.form-row{margin-bottom:12px;}
+.form-row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.btn{width:100%;padding:13px;border-radius:10px;border:none;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .17s;}
+.btn-primary{background:linear-gradient(135deg,var(--blue),#075985);color:#fff;box-shadow:0 3px 10px rgba(3,105,161,.25);}
+.btn-green{background:linear-gradient(135deg,var(--green),#047857);color:#fff;}
+.btn-accent{background:linear-gradient(135deg,var(--accent),#D97706);color:var(--navy);}
 .btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text);}
-.btn:active{transform:scale(.97);opacity:.9;}
-.btn-sm{padding:7px 12px;font-size:12px;width:auto;border-radius:8px;}
+.btn-red{background:linear-gradient(135deg,var(--red),#B91C1C);color:#fff;}
+.btn:active{transform:scale(.97);}
+.btn-sm{padding:6px 12px;font-size:12px;width:auto;border-radius:8px;}
 .btn-edit{background:#EFF6FF;color:var(--blue);border:1px solid #BAE6FD;}
 .btn-del{background:#FEF2F2;color:var(--red);border:1px solid #FECACA;}
-.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;}
-.bg{background:#DCFCE7;color:#15803D;}.br{background:#FEE2E2;color:#B91C1C;}.bo{background:#FEF3C7;color:#92400E;}.bb{background:#DBEAFE;color:#1D4ED8;}.bk{background:#F1F5F9;color:var(--muted);}
-.tiles{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:13px;}
-.tile{background:var(--card);border-radius:13px;padding:14px;text-align:center;border:1px solid var(--border);box-shadow:0 2px 8px rgba(11,30,61,.06);}
-.tile-val{font-size:16px;font-weight:700;font-family:'Roboto Mono',monospace;}
-.tile-lbl{font-size:10px;color:var(--muted);margin-top:3px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;}
-.t-blue .tile-val{color:var(--blue);}.t-green .tile-val{color:var(--green);}.t-red .tile-val{color:var(--red);}.t-orange .tile-val{color:var(--orange);}
-.entry-item{background:var(--card);border-radius:12px;padding:13px 15px;margin-bottom:9px;border:1px solid var(--border);box-shadow:0 2px 8px rgba(11,30,61,.05);}
-.entry-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px;}
-.e-tid{font-size:13px;font-weight:700;color:var(--blue);font-family:'Roboto Mono',monospace;margin-bottom:2px;}
-.e-meta{font-size:12px;color:var(--muted);}
-.e-amt{font-size:16px;font-weight:700;font-family:'Roboto Mono',monospace;text-align:right;}
-.e-batch{font-size:11px;color:var(--muted);text-align:right;margin-top:2px;}
+.big-wrap{position:relative;}
+.big-sym{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:18px;font-weight:700;color:var(--muted);}
+.big-input{padding-left:34px!important;font-size:20px!important;font-weight:700!important;font-family:'Roboto Mono',monospace!important;height:58px;}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.tiles-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;}
+.tile{background:var(--card);border-radius:12px;padding:13px 10px;text-align:center;border:1px solid var(--border);box-shadow:var(--shadow);}
+.tile-val{font-size:15px;font-weight:700;font-family:'Roboto Mono',monospace;}
+.tile-lbl{font-size:9px;color:var(--muted);margin-top:3px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;}
+.t-b .tile-val{color:var(--blue);}.t-g .tile-val{color:var(--green);}.t-r .tile-val{color:var(--red);}.t-o .tile-val{color:var(--orange);}
+.entry-item{background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:8px;border:1px solid var(--border);box-shadow:var(--shadow);}
+.entry-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+.e-main{font-size:13px;font-weight:700;color:var(--blue);font-family:'Roboto Mono',monospace;}
+.e-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.e-amt{font-size:15px;font-weight:700;font-family:'Roboto Mono',monospace;text-align:right;}
+.e-amt.debit{color:var(--red);}
+.e-amt.credit{color:var(--green);}
+.e-meta{font-size:11px;color:var(--muted);text-align:right;margin-top:2px;}
 .entry-actions{display:flex;gap:7px;}
-.recv-entry{background:var(--card);border-radius:12px;padding:13px 15px;margin-bottom:9px;border:1px solid var(--border);box-shadow:0 2px 8px rgba(11,30,61,.05);}
-.recv-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;}
-.recv-label{font-size:16px;font-weight:700;font-family:'Roboto Mono',monospace;}
-.recv-sub{font-size:11px;color:var(--muted);margin-bottom:8px;}
-.recv-actions{display:flex;gap:7px;}
-.match-title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:9px;display:flex;align-items:center;gap:6px;}
-.batch-row{border-radius:11px;padding:12px 14px;margin-bottom:8px;border:1.5px solid;display:flex;justify-content:space-between;align-items:flex-start;}
-.batch-row.settled{background:#F0FDF4;border-color:#86EFAC;}
-.batch-row.pending{background:#FFF7ED;border-color:#FED7AA;}
-.br-num{font-size:17px;font-weight:800;font-family:'Roboto Mono',monospace;line-height:1;margin-bottom:3px;}
-.batch-row.settled .br-num{color:#15803D;}
-.batch-row.pending .br-num{color:var(--orange);}
-.br-tid{font-size:12px;font-weight:700;font-family:'Roboto Mono',monospace;color:var(--navy);}
-.br-meta{font-size:11px;color:var(--muted);margin-top:2px;}
-.br-right{text-align:right;min-width:100px;}
-.br-amt{font-size:15px;font-weight:700;font-family:'Roboto Mono',monospace;}
-.batch-row.settled .br-amt{color:#15803D;}
-.batch-row.pending .br-amt{color:var(--orange);}
-.br-status{font-size:11px;margin-top:3px;}
+.badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700;}
+.bg{background:#D1FAE5;color:#065F46;}.br{background:#FEE2E2;color:#991B1B;}.bb{background:#DBEAFE;color:#1D4ED8;}.bo{background:#FEF3C7;color:#92400E;}
+.sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.sh-title{font-size:14px;font-weight:700;}.sh-count{font-size:12px;color:var(--muted);}
+.dg-hdr{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;padding:6px 2px 4px;margin-top:4px;}
+.divider{height:1px;background:var(--border);margin:13px 0;}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.chip{padding:6px 12px;border-radius:20px;font-size:11px;font-weight:700;border:1.5px solid var(--border);background:var(--card);cursor:pointer;color:var(--muted);transition:all .15s;}
+.chip.active{background:var(--navy);border-color:var(--navy);color:#fff;}
 .tbl-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--border);}
-.tbl{width:100%;border-collapse:collapse;font-size:12px;min-width:480px;}
-.tbl th{background:#0369A1;color:#fff;padding:10px 11px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;}
-.tbl td{padding:10px 11px;border-bottom:1px solid var(--border);}
+.tbl{width:100%;border-collapse:collapse;font-size:12px;min-width:520px;}
+.tbl th{background:var(--navy);color:#fff;padding:9px 11px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.4px;}
+.tbl td{padding:9px 11px;border-bottom:1px solid var(--border);}
 .tbl tr:last-child td{border-bottom:none;}
-.tbl tr:nth-child(even) td{background:#F8FAFD;}
-.tbl tfoot td{background:#0C4A6E!important;color:#fff!important;font-weight:700;}
-.filter-bar{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:13px;}
-.chip{padding:6px 13px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:var(--card);cursor:pointer;transition:all .15s;color:var(--muted);}
-.chip.active{background:#0369A1;border-color:#0369A1;color:#fff;}
-.tid-tag{display:inline-flex;align-items:center;gap:5px;background:#E0F2FE;color:var(--blue);border-radius:7px;padding:5px 11px;font-size:12px;font-weight:600;margin:3px;font-family:'Roboto Mono',monospace;}
-.tid-tag .rm{cursor:pointer;color:var(--red);font-size:14px;line-height:1;}
-.tid-wrap{display:flex;flex-wrap:wrap;margin-bottom:11px;min-height:36px;}
-.sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;}
-.sh-title{font-size:15px;font-weight:700;}.sh-count{font-size:12px;color:var(--muted);}
-.dg-header{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:7px 3px 5px;margin-top:3px;}
-.toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--navy);color:#fff;padding:11px 22px;border-radius:28px;font-size:13px;font-weight:600;opacity:0;transition:all .3s;z-index:999;white-space:nowrap;box-shadow:0 8px 24px rgba(11,30,61,.35);}
+.tbl tr:nth-child(even) td{background:#F5FAFE;}
+.tbl tfoot td{background:var(--navy2)!important;color:#fff!important;font-weight:700;}
+.cust-tag{display:inline-flex;align-items:center;gap:5px;background:#E0F2FE;color:var(--blue);border-radius:7px;padding:5px 10px;font-size:12px;font-weight:600;margin:3px;}
+.cust-tag .rm{cursor:pointer;color:var(--red);font-size:14px;}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(12,53,71,.5);z-index:200;align-items:flex-end;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal-box{background:#fff;border-radius:22px 22px 0 0;padding:20px 16px 36px;width:100%;max-width:500px;max-height:92vh;overflow-y:auto;box-shadow:0 -8px 40px rgba(12,53,71,.2);}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:4px;margin:0 auto 16px;}
+.toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--navy);color:#fff;padding:11px 22px;border-radius:28px;font-size:13px;font-weight:600;opacity:0;transition:all .3s;z-index:999;white-space:nowrap;box-shadow:var(--shadow-md);}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 .toast.ok{background:var(--green);}.toast.err{background:var(--red);}
-.divider{height:1px;background:var(--border);margin:14px 0;}
-.empty{text-align:center;padding:32px 20px;color:var(--muted);}
-.empty .ico{font-size:36px;margin-bottom:9px;}.empty p{font-size:14px;}
-.export-row{display:flex;gap:9px;margin-top:13px;}
-.export-row .btn{flex:1;padding:13px;font-size:13px;}
-.big-amt-wrap{position:relative;}
-.big-rupee{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:20px;font-weight:700;color:var(--muted);}
-.big-amt{padding-left:36px!important;font-size:22px!important;font-weight:700!important;font-family:'Roboto Mono',monospace!important;height:60px;}
-.progress-wrap{background:#E5E7EB;border-radius:20px;height:8px;overflow:hidden;margin:8px 0;}
-.progress-bar{height:100%;border-radius:20px;transition:width .5s ease;}
-.rep-section{margin-bottom:18px;}
-.rep-section-hdr{font-size:13px;font-weight:700;color:#fff;padding:10px 13px;background:#0C4A6E;border-radius:10px 10px 0 0;}
-.rep-section .tbl-wrap{border-radius:0 0 12px 12px;border-top:none;}
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(11,30,61,.55);z-index:200;align-items:flex-end;justify-content:center;}
-.modal-overlay.open{display:flex;}
-.modal-box{background:#fff;border-radius:22px 22px 0 0;padding:22px 18px 36px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;}
-.modal-handle{width:38px;height:4px;background:var(--border);border-radius:4px;margin:0 auto 18px;}
-/* BPCL info banner */
-.bpcl-banner{background:linear-gradient(135deg,#0369A1,#0C4A6E);border-radius:14px;padding:16px 18px;margin-bottom:14px;color:#fff;display:flex;align-items:center;gap:12px;}
-.bpcl-icon{font-size:28px;flex-shrink:0;}
-.bpcl-text h3{font-size:14px;font-weight:800;margin-bottom:3px;}
-.bpcl-text p{font-size:11px;color:rgba(255,255,255,.65);line-height:1.5;}
+.empty{text-align:center;padding:28px 20px;color:var(--muted);}
+.empty .ico{font-size:34px;margin-bottom:8px;}
+.export-row{display:flex;gap:9px;margin-bottom:14px;}
+.export-row .btn{flex:1;padding:12px;font-size:13px;}
+/* LEDGER */
+.ledger-wrap{background:var(--card);border-radius:15px;border:1px solid var(--border);overflow:hidden;margin-bottom:14px;}
+.ledger-hdr{background:var(--navy);color:#fff;padding:0;}
+.ledger-hdr-row{display:grid;grid-template-columns:90px 1fr 100px 100px 100px;padding:10px 12px;}
+.ledger-hdr-row span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:rgba(255,255,255,.7);}
+.ledger-row{display:grid;grid-template-columns:90px 1fr 100px 100px 100px;padding:9px 12px;border-bottom:1px solid var(--border);font-size:12px;}
+.ledger-row:last-child{border-bottom:none;}
+.ledger-row.opening{background:#F0F9FF;}
+.ledger-row.subtotal{background:#F5FAFE;font-weight:700;}
+.ledger-row.total-row{background:var(--navy2);color:#fff;font-weight:700;}
+.ledger-row.closing{background:var(--navy);color:#fff;font-weight:800;}
+.lr-date{font-size:11px;color:var(--muted);white-space:nowrap;}
+.lr-particulars{font-weight:600;color:var(--text);}
+.lr-batch{font-family:'Roboto Mono',monospace;font-size:11px;color:var(--muted);}
+.lr-debit{font-family:'Roboto Mono',monospace;font-weight:700;color:var(--red);text-align:right;}
+.lr-credit{font-family:'Roboto Mono',monospace;font-weight:700;color:var(--green);text-align:right;}
+.lr-balance{font-family:'Roboto Mono',monospace;font-weight:700;text-align:right;}
+.bal-banner{background:var(--navy);border-radius:14px;padding:16px 18px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.bal-item{text-align:center;}
+.bal-lbl{font-size:10px;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
+.bal-val{font-size:16px;font-weight:800;font-family:'Roboto Mono',monospace;color:#fff;}
+.bal-val.pos{color:#6EE7B7;}.bal-val.neg{color:#FCA5A5;}.bal-val.zero{color:#fff;}
+.tid-tag{display:inline-flex;align-items:center;gap:5px;background:#E0F2FE;color:var(--blue);border-radius:7px;padding:5px 10px;font-size:12px;font-weight:600;margin:3px;font-family:'Roboto Mono',monospace;}
+.tid-tag .rm{cursor:pointer;color:var(--red);font-size:14px;}
+.tid-wrap{display:flex;flex-wrap:wrap;margin-bottom:10px;min-height:34px;}
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <div class="brand-row">
+  <div class="top-row">
     <div class="brand">
       <div class="brand-icon">⛽</div>
-      <div class="brand-texts">
+      <div>
         <div class="brand-name">Fleet Card Manager</div>
         <div class="brand-sub">BPCL Transaction Tracker</div>
       </div>
     </div>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-      <span id="sync-status" style="font-size:11px;color:rgba(255,255,255,.7);font-weight:600;">⏳ Loading...</span>
-    </div>
+    <div class="sync-pill"><div class="sync-dot" id="sdot"></div><span id="stxt">Loading</span></div>
   </div>
   <div class="tabs">
-    <div class="tab active" onclick="switchTab('dsm')">📥 DSM Entry</div>
+    <div class="tab active" onclick="switchTab('dsm')">📥 DSM</div>
     <div class="tab" onclick="switchTab('recv')">💰 Received</div>
     <div class="tab" onclick="switchTab('report')">📊 Report</div>
+    <div class="tab" onclick="switchTab('ledger')">📒 Ledger</div>
+    <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
   </div>
 </div>
 
 <!-- ═══ DSM ENTRY ═══ -->
 <div class="page active" id="page-dsm">
-  <div class="bpcl-banner">
-    <div class="bpcl-icon">⛽</div>
-    <div class="bpcl-text">
-      <h3>BPCL Fleet Card</h3>
-      <p>Each batch is settled individually by BPCL. One received entry = one batch matched by exact amount.</p>
-    </div>
-  </div>
   <div class="card">
-    <div class="card-title"><span>📲</span> New Batch Entry</div>
+    <div class="card-title">📲 New Debit Entry</div>
     <div class="form-row"><label>Select TID</label><select id="dsm-tid"></select></div>
+    <div class="form-row"><label>Customer / Particulars</label><select id="dsm-cust"></select></div>
     <div class="form-row-2">
-      <div><label>Batch Number</label><input type="number" id="dsm-batch" placeholder="e.g. 101" min="1"></div>
-      <div><label>Transaction Date</label><input type="date" id="dsm-date"></div>
+      <div><label>Batch No.</label><input type="number" id="dsm-batch" placeholder="e.g. 62" min="1"></div>
+      <div><label>Date</label><input type="date" id="dsm-date"></div>
     </div>
     <div class="form-row">
-      <label>Batch Amount (₹)</label>
-      <div class="big-amt-wrap"><span class="big-rupee">₹</span><input type="number" id="dsm-amount" class="big-amt" placeholder="0.00" min="0" step="0.01"></div>
+      <label>Debit Amount (₹)</label>
+      <div class="big-wrap"><span class="big-sym">₹</span><input type="number" id="dsm-amount" class="big-input" placeholder="0.00" min="0" step="0.01"></div>
     </div>
-    <button class="btn btn-primary" onclick="saveDSM()">＋ Save Batch Entry</button>
+    <button class="btn btn-primary" onclick="saveDSM()">＋ Save Debit Entry</button>
   </div>
-  <div class="card">
-    <div class="card-title"><span>⚙️</span> Manage TID Numbers</div>
-    <div class="tid-wrap" id="tid-tags"></div>
-    <div style="display:flex;gap:8px;">
-      <input type="text" id="new-tid" placeholder="Enter TID e.g. TID-123456" style="flex:1;">
-      <button class="btn btn-sm btn-accent" onclick="addTID()">+ Add</button>
-    </div>
-  </div>
-  <div class="sh"><div class="sh-title">Today's Entries</div><div class="sh-count" id="today-count">0 batches</div></div>
+  <div class="sh"><div class="sh-title">Today's Entries</div><div class="sh-count" id="today-count"></div></div>
   <div id="dsm-today"></div>
   <div class="divider"></div>
   <div class="sh"><div class="sh-title">Recent Entries</div><div class="sh-count" id="recent-count"></div></div>
@@ -176,70 +174,131 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 <!-- ═══ RECEIVED ═══ -->
 <div class="page" id="page-recv">
   <div class="tiles">
-    <div class="tile t-blue"><div class="tile-val" id="ov-total">₹0</div><div class="tile-lbl">Total Batches</div></div>
-    <div class="tile t-green"><div class="tile-val" id="ov-recv">₹0</div><div class="tile-lbl">Total Received</div></div>
-    <div class="tile t-orange"><div class="tile-val" id="ov-pending">₹0</div><div class="tile-lbl">Still Pending</div></div>
-    <div class="tile t-red"><div class="tile-val" id="ov-cnt">0</div><div class="tile-lbl">Pending Batches</div></div>
+    <div class="tile t-r"><div class="tile-val" id="ov-dr">₹0</div><div class="tile-lbl">Total Debit</div></div>
+    <div class="tile t-g"><div class="tile-val" id="ov-cr">₹0</div><div class="tile-lbl">Total Credit</div></div>
+    <div class="tile t-o"><div class="tile-val" id="ov-bal">₹0</div><div class="tile-lbl">Balance</div></div>
+    <div class="tile t-b"><div class="tile-val" id="ov-ob">₹0</div><div class="tile-lbl">Opening Bal</div></div>
   </div>
   <div class="card">
-    <div class="card-title"><span>💳</span> Enter BPCL Credit Received</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6;">Enter the exact amount credited by BPCL. It will auto-match to the batch with the <strong>same amount</strong>.</p>
-    <div class="form-row"><label>Credit Date</label><input type="date" id="recv-date"></div>
-    <div class="form-row">
-      <label>Amount Received (₹)</label>
-      <div class="big-amt-wrap"><span class="big-rupee">₹</span><input type="number" id="recv-amount" class="big-amt" placeholder="0.00" min="0" step="0.01"></div>
+    <div class="card-title">💳 Enter Credit Received</div>
+    <div class="form-row"><label>Customer / Particulars</label><select id="recv-cust"></select></div>
+    <div class="form-row-2">
+      <div><label>Batch No.</label><input type="number" id="recv-batch" placeholder="e.g. 3132" min="1"></div>
+      <div><label>Date</label><input type="date" id="recv-date"></div>
     </div>
-    <div class="form-row" style="margin-bottom:4px;"><label>Note (optional)</label><input type="text" id="recv-note" placeholder="e.g. BPCL ref 12345"></div>
-    <button class="btn btn-green" onclick="saveRecv()" style="margin-top:12px;">✓ Save Received Entry</button>
+    <div class="form-row">
+      <label>Credit Amount (₹)</label>
+      <div class="big-wrap"><span class="big-sym">₹</span><input type="number" id="recv-amount" class="big-input" placeholder="0.00" min="0" step="0.01"></div>
+    </div>
+    <div class="form-row" style="margin-bottom:4px;"><label>Note (optional)</label><input type="text" id="recv-note" placeholder="e.g. Reference no."></div>
+    <button class="btn btn-green" onclick="saveRecv()" style="margin-top:11px;">✓ Save Credit Entry</button>
   </div>
-  <div class="sh"><div class="sh-title">Received Entries</div><div class="sh-count" id="recv-count"></div></div>
+  <div class="sh"><div class="sh-title">Recent Credits</div><div class="sh-count" id="recv-count"></div></div>
   <div id="recv-list"></div>
-  <div class="divider"></div>
-  <div class="sh"><div class="sh-title">🔍 Batch Match Status</div><div class="sh-count" id="match-count"></div></div>
-  <p style="font-size:12px;color:var(--muted);margin-bottom:13px;">Each batch matched individually by exact amount against BPCL credits.</p>
-  <div id="match-list"></div>
 </div>
 
 <!-- ═══ REPORT ═══ -->
 <div class="page" id="page-report">
   <div class="card">
-    <div class="card-title"><span>🗓️</span> Report Filters</div>
-    <div class="filter-bar">
+    <div class="card-title">🗓️ Filters</div>
+    <div class="chips" id="rep-chips">
       <div class="chip active" onclick="setFilter('today',this)">Today</div>
       <div class="chip" onclick="setFilter('week',this)">This Week</div>
       <div class="chip" onclick="setFilter('month',this)">This Month</div>
       <div class="chip" onclick="setFilter('all',this)">All Time</div>
       <div class="chip" onclick="setFilter('custom',this)">Custom</div>
     </div>
-    <div id="custom-range" style="display:none;margin-bottom:11px;">
+    <div id="rep-custom" style="display:none;">
       <div class="form-row-2">
         <div><label>From</label><input type="date" id="rep-from" onchange="refreshReport()"></div>
         <div><label>To</label><input type="date" id="rep-to" onchange="refreshReport()"></div>
       </div>
     </div>
-    <div><label>Filter by TID</label><select id="rep-tid" onchange="refreshReport()"><option value="ALL">All TIDs</option></select></div>
+    <div class="form-row-2">
+      <div><label>TID</label><select id="rep-tid" onchange="refreshReport()"><option value="ALL">All TIDs</option></select></div>
+      <div><label>Particulars</label><select id="rep-cust" onchange="refreshReport()"><option value="ALL">All</option><option value="Fleet Card">Fleet Card</option></select></div>
+    </div>
   </div>
   <div class="tiles">
-    <div class="tile t-blue"><div class="tile-val" id="rt-txn">₹0</div><div class="tile-lbl">Batch Total</div></div>
-    <div class="tile t-green"><div class="tile-val" id="rt-settled">₹0</div><div class="tile-lbl">Settled</div></div>
-    <div class="tile t-orange"><div class="tile-val" id="rt-pending">₹0</div><div class="tile-lbl">Pending Amt</div></div>
-    <div class="tile t-red"><div class="tile-val" id="rt-cnt">0</div><div class="tile-lbl">Pending Batches</div></div>
-  </div>
-  <div class="rep-section">
-    <div class="rep-section-hdr">📋 Batch Transactions — Settlement Status</div>
-    <div class="tbl-wrap" id="rep-batch-tbl"><div class="empty"><div class="ico">📊</div><p>No data</p></div></div>
-  </div>
-  <div class="rep-section">
-    <div class="rep-section-hdr">💳 Received Credits — BPCL Payments</div>
-    <div class="tbl-wrap" id="rep-recv-tbl"><div class="empty"><div class="ico">💳</div><p>No received entries</p></div></div>
+    <div class="tile t-r"><div class="tile-val" id="rt-dr">₹0</div><div class="tile-lbl">Total Debit</div></div>
+    <div class="tile t-g"><div class="tile-val" id="rt-cr">₹0</div><div class="tile-lbl">Total Credit</div></div>
+    <div class="tile t-o"><div class="tile-val" id="rt-bal">₹0</div><div class="tile-lbl">Net Balance</div></div>
+    <div class="tile t-b"><div class="tile-val" id="rt-cnt">0</div><div class="tile-lbl">Entries</div></div>
   </div>
   <div class="export-row">
     <button class="btn btn-accent" onclick="exportExcel()">⬇ Excel</button>
     <button class="btn btn-primary" onclick="exportPDF()">⬇ PDF</button>
   </div>
-  <div style="margin-top:28px;padding-top:16px;border-top:1px dashed #DDE5F0;text-align:center;">
+  <div style="background:var(--navy2);border-radius:10px 10px 0 0;padding:10px 13px;color:#fff;font-size:12px;font-weight:700;">📋 Transaction Report</div>
+  <div class="tbl-wrap" style="border-radius:0 0 12px 12px;border-top:none;" id="rep-tbl"></div>
+</div>
+
+<!-- ═══ LEDGER ═══ -->
+<div class="page" id="page-ledger">
+  <div class="card">
+    <div class="card-title">📒 Ledger Filters</div>
+    <div class="form-row-2">
+      <div><label>From Date</label><input type="date" id="led-from"></div>
+      <div><label>To Date</label><input type="date" id="led-to"></div>
+    </div>
+    <div class="form-row-2">
+      <div><label>TID</label><select id="led-tid"><option value="ALL">All TIDs</option></select></div>
+      <div><label>Particulars</label><select id="led-cust"><option value="ALL">All (Combined)</option><option value="Fleet Card">Fleet Card Only</option></select></div>
+    </div>
+    <button class="btn btn-primary" onclick="generateLedger()">📒 Generate Ledger</button>
+  </div>
+  <div id="ledger-output" style="display:none;">
+    <div class="bal-banner">
+      <div class="bal-item"><div class="bal-lbl">Opening Balance</div><div class="bal-val" id="led-ob">₹0</div></div>
+      <div class="bal-item"><div class="bal-lbl">Closing Balance</div><div class="bal-val" id="led-cb">₹0</div></div>
+      <div class="bal-item"><div class="bal-lbl">Net Movement</div><div class="bal-val" id="led-net">₹0</div></div>
+    </div>
+    <div class="export-row">
+      <button class="btn btn-accent" onclick="exportLedgerExcel()">⬇ Excel</button>
+      <button class="btn btn-primary" onclick="exportLedgerPDF()">⬇ PDF</button>
+    </div>
+    <div class="ledger-wrap">
+      <div class="ledger-hdr">
+        <div class="ledger-hdr-row">
+          <span>Date</span><span>Particulars / TID / Batch</span><span style="text-align:right">Debit</span><span style="text-align:right">Credit</span><span style="text-align:right">Balance</span>
+        </div>
+      </div>
+      <div id="ledger-rows"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SETTINGS ═══ -->
+<div class="page" id="page-settings">
+  <div class="card">
+    <div class="card-title">⚙️ Manage TID Numbers</div>
+    <div class="tid-wrap" id="tid-tags"></div>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="new-tid" placeholder="e.g. TID-226205" style="flex:1;">
+      <button class="btn btn-sm btn-accent" onclick="addTID()">+ Add</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">👥 Manage Customers</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:11px;">Fleet Card is always available by default. Add transport companies, customers etc.</p>
+    <div id="cust-list" style="margin-bottom:11px;"></div>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="new-cust" placeholder="e.g. BERWAL TRANSPORT SERVICE" style="flex:1;">
+      <button class="btn btn-sm btn-accent" onclick="addCustomer()">+ Add</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">💰 Opening Balance</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:11px;">Set the opening balance for ledger calculations.</p>
+    <div class="form-row">
+      <label>Opening Balance (₹)</label>
+      <div class="big-wrap"><span class="big-sym">₹</span><input type="number" id="ob-input" class="big-input" placeholder="0.00" step="0.01"></div>
+    </div>
+    <button class="btn btn-green" onclick="saveOpeningBalance()">✓ Save Opening Balance</button>
+  </div>
+  <div style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);text-align:center;">
     <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Admin only — requires PIN</p>
-    <button onclick="showResetModal()" style="background:transparent;border:1.5px solid #FECACA;color:#B91C1C;font-size:12px;font-weight:700;padding:9px 22px;border-radius:10px;cursor:pointer;">🗑 Reset All Data</button>
+    <button onclick="showResetModal()" style="background:transparent;border:1.5px solid #FECACA;color:var(--red);font-size:12px;font-weight:700;padding:9px 22px;border-radius:10px;cursor:pointer;">🗑 Reset All Data</button>
   </div>
 </div>
 
@@ -250,33 +309,56 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
 <script>
 // ─────────────────────────────────────────────────────────────────────────────
-const RESET_PIN='1234'; // ← Change to your PIN
-const SHEET_URL='https://script.google.com/macros/s/AKfycbxahk0NG0CtxD7K64rjCNk0fHWh-IxFOXOIh31a-9QMTmeaFKXEeNs7eaxKY5ai-wL47w/exec';
-const LOCAL_KEY='fleet_active';
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbwQm89_BZuG5zXWxj3511psVWcLOmQw-JQlgfs5_ClRpSXUixnmb5OOPSgy_HnB9y6j/exec';
+const RESET_PIN = '1234';
 
-let db = { tids:[], transactions:[], received:[] };
-let syncStatus = 'idle';
+// db: { tids:[], customers:[], transactions:[], received:[], openingBalance:0 }
+// transaction: { id, tid, customer, batch, date, amount, createdAt }
+// received: { id, customer, batch, date, amount, note, savedAt }
+const DEFAULT_CUSTOMERS = ["TIRUPATI ENTERPRISE", "ANDHRA ROADLINES INDIA PVT LTD", "SANGWAN CONTAINER SERVICE", "BERWAL TRANSPORT SERVICE", "GURUKRUPA LOGISTICS AT", "TIRUPATI ROADLINES", "KABA EXPRESS PRIVATE LIMITED", "JAY MAA VINDHYAVASHINI", "GBR", "SARASWATI ROADWAYS", "MALKAPUR TRANSPORT", "ANUJ ROAD CARRIER", "GAYATRI ENTERPRISE", "DIVYA KOOL EX", "SAURABH FRIEGHT CARRIER", "ANKIT RAOD CARRIERS", "SANGAM FRIEGHT CARRIERS", "RANJEET ARVINDBHAI JOSHI", "GURUKRUPA ROADLINES", "PAYAL ENTERPRISE", "SHREE BHAGYODAY", "BHUMIKA D CHHEDA", "DAMJI HIRJI CHHEDA", "DHARMESH D CHHEDA", "ZAVERI D CHHEDA"];
+let db = { tids:[], customers:[], transactions:[], received:[], openingBalance:0 };
+
+// ── UTILS ──────────────────────────────────────────────────────────────────
+function todayStr(){return new Date().toISOString().split('T')[0];}
+function firstOfMonth(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;}
+function fmtAmt(n){return'₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtDate(d){
+  if(!d)return'—';const s=String(d);
+  if(s.includes('/'))return s;
+  if(s.includes('-')){const p=s.split('-');if(p.length===3)return`${p[2]}/${p[1]}/${p[0]}`;}
+  try{const dt=new Date(d);if(!isNaN(dt.getTime()))return`${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;}catch{}
+  return s;
+}
+function normalizeDate(d){
+  if(!d)return'';const s=String(d);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+  try{const dt=new Date(d);if(!isNaN(dt.getTime()))return`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;}catch{}
+  return s;
+}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function toast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.className='toast',2800);}
+function allEntries(){
+  const txns=db.transactions.map(t=>({...t,type:'debit'}));
+  const recv=db.received.map(r=>({...r,type:'credit',amount:r.amount}));
+  return [...txns,...recv].sort((a,b)=>a.date.localeCompare(b.date)||(a.createdAt||a.savedAt||'').localeCompare(b.createdAt||b.savedAt||''));
+}
 
 // ── SYNC ───────────────────────────────────────────────────────────────────
 function setSyncStatus(s){
-  syncStatus=s;
-  const el=document.getElementById('sync-status');
-  if(!el)return;
-  if(s==='syncing'){el.textContent='⏳ Syncing...';el.style.color='#F59E0B';}
-  else if(s==='ok'){el.textContent='✅ Live';el.style.color='#10B981';}
-  else if(s==='err'){el.textContent='⚠️ Offline';el.style.color='#EF4444';}
+  const dot=document.getElementById('sdot'),txt=document.getElementById('stxt');
+  if(s==='syncing'){dot.className='sync-dot';dot.style.background='var(--accent)';txt.textContent='Syncing';}
+  else if(s==='ok'){dot.className='sync-dot live';txt.textContent='Live';}
+  else{dot.className='sync-dot err';txt.textContent='Offline';}
 }
-const PROXY='https://corsproxy.io/?';
 async function apiGet(action){
-  const r=await fetch(PROXY+encodeURIComponent(`${SHEET_URL}?action=${action}`));
+  const r=await fetch(`${SHEET_URL}?action=${action}`,{redirect:'follow'});
   return r.json();
 }
 async function apiPost(payload){
   const url=`${SHEET_URL}?payload=${encodeURIComponent(JSON.stringify(payload))}`;
-  const r=await fetch(PROXY+encodeURIComponent(url));
+  const r=await fetch(url,{redirect:'follow'});
   return r.json();
 }
-
 async function loadFromSheet(){
   setSyncStatus('syncing');
   try{
@@ -285,129 +367,124 @@ async function loadFromSheet(){
     db.tids=remote.tids||[];
     db.transactions=(remote.transactions||[]).map(t=>({...t,date:normalizeDate(t.date),amount:Number(t.amount)}));
     db.received=(remote.received||[]).map(r=>({...r,date:normalizeDate(r.date),amount:Number(r.amount)}));
+    db.openingBalance=Number(remote.openingBalance||0);
+    // Preload default customers if none in sheet yet
+    if(!remote.customers||remote.customers.length===0){
+      db.customers=[...DEFAULT_CUSTOMERS];
+      // Save all to sheet
+      for(const name of DEFAULT_CUSTOMERS){
+        apiPost({action:'saveCustomer',name});
+      }
+    } else {
+      db.customers=remote.customers;
+    }
     setSyncStatus('ok');
-    renderTIDs();autoFillBatch();refreshDSM();
+    renderAll();
   }catch(e){
     setSyncStatus('err');
     toast('Offline — using local data','err');
-    const local=localStorage.getItem('fleet_db');
+    const local=localStorage.getItem('fleet2_db');
     if(local)try{Object.assign(db,JSON.parse(local));}catch{}
-    renderTIDs();autoFillBatch();refreshDSM();
+    renderAll();
   }
 }
-function saveLocal(){localStorage.setItem('fleet_db',JSON.stringify(db));}
-
-// ── UTILS ──────────────────────────────────────────────────────────────────
-function todayStr(){return new Date().toISOString().split('T')[0];}
-function normalizeDate(d){
-  if(!d||d==='—'||d==='undefined'||d===null)return'';
-  const s=String(d);
-  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
-  try{const dt=new Date(d);if(!isNaN(dt.getTime())){return`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;}}catch{}
-  return s;
-}
-function fmtDate(d){
-  if(!d||d==='—'||d==='undefined')return'—';
-  if(typeof d==='object'||String(d).length>10){try{const dt=new Date(d);if(!isNaN(dt.getTime()))return`${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;}catch{return'—';}}
-  if(String(d).includes('-')){const p=String(d).split('-');if(p.length===3)return`${p[2]}/${p[1]}/${p[0]}`;}
-  if(String(d).includes('/'))return String(d);
-  return'—';
-}
-function fmtAmt(n){if(n===null||n===undefined||n==='')return'—';return'₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
-function toast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.className='toast',2800);}
-
-// ── MATCH ENGINE — 1 BATCH = 1 RECEIVED BY EXACT AMOUNT ───────────────────
-// BPCL settles each batch individually with exact same amount.
-// For each batch, look for an unused received entry with matching amount.
-// ─────────────────────────────────────────────────────────────────────────────
-function computeMatch(){
-  const TOLERANCE = 1.00;
-  const batches=[...db.transactions].sort((a,b)=>a.date.localeCompare(b.date)||(parseInt(a.batch)-parseInt(b.batch)));
-  const totalBatches=batches.reduce((s,b)=>s+b.amount,0);
-  const totalReceived=db.received.reduce((s,r)=>s+r.amount,0);
-
-  // Pool of unmatched received entries (track usage)
-  const usedReceived=new Set();
-  const smap={};
-
-  for(const b of batches){
-    // Find an unused received entry with same amount (within tolerance)
-    const match=db.received.find(r=>
-      !usedReceived.has(r.id) &&
-      Math.abs(r.amount - b.amount) <= TOLERANCE
-    );
-    if(match){
-      usedReceived.add(match.id);
-      smap[b.id]={status:'settled', receivedAmt:match.amount, receivedDate:match.date, receivedId:match.id};
-    } else {
-      smap[b.id]={status:'pending', receivedAmt:0, receivedDate:null, receivedId:null};
-    }
-  }
-
-  // Mark which received entries are unmatched (excess/unlinked)
-  const unmatchedReceived=db.received.filter(r=>!usedReceived.has(r.id));
-
-  const result=batches.map(b=>({...b,...smap[b.id]}));
-  return{
-    batches:result,
-    totalBatches,
-    totalReceived,
-    totalPending:result.filter(b=>b.status==='pending').reduce((s,b)=>s+b.amount,0),
-    pendingCount:result.filter(b=>b.status==='pending').length,
-    settledCount:result.filter(b=>b.status==='settled').length,
-    unmatchedReceived
-  };
-}
+function saveLocal(){localStorage.setItem('fleet2_db',JSON.stringify(db));}
+function renderAll(){renderTIDs();renderCustomers();populateDropdowns();refreshDSM();refreshRecv();document.getElementById('ob-input').value=db.openingBalance||'';}
 
 // ── TABS ───────────────────────────────────────────────────────────────────
 function switchTab(tab){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['dsm','recv','report'][i]===tab));
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['dsm','recv','report','ledger','settings'][i]===tab));
   document.getElementById('page-'+tab).classList.add('active');
-  if(tab==='recv')refreshRecv();
-  if(tab==='report'){populateRepTid();refreshReport();}
+  if(tab==='report')refreshReport();
+  if(tab==='ledger'){
+    document.getElementById('led-from').value=firstOfMonth();
+    document.getElementById('led-to').value=todayStr();
+    populateLedgerFilters();
+  }
+  if(tab==='settings')renderAll();
 }
 
-// ── TID MANAGEMENT ─────────────────────────────────────────────────────────
+// ── DROPDOWNS ─────────────────────────────────────────────────────────────
+function populateDropdowns(){
+  // TID dropdowns
+  ['dsm-tid','rep-tid','led-tid'].forEach(id=>{
+    const sel=document.getElementById(id);if(!sel)return;
+    const cur=sel.value||'ALL';
+    const opts=id==='dsm-tid'?'<option value="">— Choose TID —</option>':'<option value="ALL">All TIDs</option>';
+    sel.innerHTML=opts+(db.tids||[]).map(t=>`<option${t===cur?' selected':''}>${t}</option>`).join('');
+  });
+  // Customer dropdowns
+  const custs=['Fleet Card',...(db.customers||[])];
+  ['dsm-cust','recv-cust'].forEach(id=>{
+    const sel=document.getElementById(id);if(!sel)return;
+    const cur=sel.value||'Fleet Card';
+    sel.innerHTML=custs.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
+  });
+  // Report customer filter
+  const rc=document.getElementById('rep-cust');
+  if(rc){const cur=rc.value||'ALL';rc.innerHTML='<option value="ALL">All</option>'+'<option value="Fleet Card">Fleet Card</option>'+(db.customers||[]).map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');}
+  // Ledger customer filter
+  const lc=document.getElementById('led-cust');
+  if(lc){const cur=lc.value||'ALL';lc.innerHTML='<option value="ALL">All (Combined)</option><option value="Fleet Card">Fleet Card Only</option>'+(db.customers||[]).map(c=>`<option value="${c}"${c===cur?' selected':''}>${c} Only</option>`).join('');}
+}
+function populateLedgerFilters(){populateDropdowns();}
+
+// ── TID ────────────────────────────────────────────────────────────────────
 function renderTIDs(){
   document.getElementById('tid-tags').innerHTML=(db.tids||[]).map(t=>`<span class="tid-tag">${t}<span class="rm" onclick="removeTID('${t}')">×</span></span>`).join('');
-  const sel=document.getElementById('dsm-tid'),cur=sel.value;
-  sel.innerHTML='<option value="">— Choose TID —</option>'+(db.tids||[]).map(t=>`<option${t===cur?' selected':''}>${t}</option>`).join('');
-  populateRepTid();
+  populateDropdowns();
 }
 async function addTID(){
   const inp=document.getElementById('new-tid'),val=inp.value.trim().toUpperCase();
   if(!val)return toast('Enter a TID','err');
-  if(db.tids.includes(val))return toast('TID already exists','err');
+  if((db.tids||[]).includes(val))return toast('TID already exists','err');
   db.tids.push(val);inp.value='';renderTIDs();toast(`${val} added`);saveLocal();
-  setSyncStatus('syncing');
-  await apiPost({action:'saveTID',tid:val});
-  setSyncStatus('ok');
+  setSyncStatus('syncing');await apiPost({action:'saveTID',tid:val});setSyncStatus('ok');
 }
 async function removeTID(t){
   if(db.transactions.some(x=>x.tid===t))return toast('Cannot remove — has transactions','err');
   db.tids=db.tids.filter(x=>x!==t);renderTIDs();toast(`${t} removed`,'err');saveLocal();
-  setSyncStatus('syncing');
-  await apiPost({action:'deleteTID',tid:t});
-  setSyncStatus('ok');
+  setSyncStatus('syncing');await apiPost({action:'deleteTID',tid:t});setSyncStatus('ok');
 }
-function populateRepTid(){
-  const s=document.getElementById('rep-tid'),c=s.value||'ALL';
-  s.innerHTML='<option value="ALL">All TIDs</option>'+(db.tids||[]).map(t=>`<option${t===c?' selected':''}>${t}</option>`).join('');
+
+// ── CUSTOMERS ──────────────────────────────────────────────────────────────
+function renderCustomers(){
+  document.getElementById('cust-list').innerHTML=(db.customers||[]).length?
+    (db.customers||[]).map(c=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--bg);border-radius:9px;margin-bottom:7px;">
+      <span style="font-size:13px;font-weight:600;">${c}</span>
+      <button class="btn btn-sm btn-del" onclick="removeCustomer('${c}')">✕</button>
+    </div>`).join('')
+    :'<div class="empty"><p>No customers added yet</p></div>';
+  populateDropdowns();
+}
+async function addCustomer(){
+  const inp=document.getElementById('new-cust'),val=inp.value.trim().toUpperCase();
+  if(!val)return toast('Enter customer name','err');
+  if(val==='FLEET CARD'||(db.customers||[]).includes(val))return toast('Already exists','err');
+  db.customers.push(val);inp.value='';renderCustomers();toast(`${val} added`);saveLocal();
+  setSyncStatus('syncing');await apiPost({action:'saveCustomer',name:val});setSyncStatus('ok');
+}
+async function removeCustomer(name){
+  if(db.transactions.some(t=>t.customer===name)||db.received.some(r=>r.customer===name))
+    return toast('Cannot remove — has entries','err');
+  db.customers=db.customers.filter(c=>c!==name);renderCustomers();toast('Removed','err');saveLocal();
+  setSyncStatus('syncing');await apiPost({action:'deleteCustomer',name});setSyncStatus('ok');
+}
+
+// ── OPENING BALANCE ────────────────────────────────────────────────────────
+async function saveOpeningBalance(){
+  const val=parseFloat(document.getElementById('ob-input').value)||0;
+  db.openingBalance=val;saveLocal();toast(`Opening balance set to ${fmtAmt(val)}`);
+  setSyncStatus('syncing');await apiPost({action:'saveOpeningBalance',amount:val});setSyncStatus('ok');
 }
 
 // ── DSM ENTRY ──────────────────────────────────────────────────────────────
 document.getElementById('dsm-date').value=todayStr();
-function autoFillBatch(){
-  if(db.transactions.length>0){
-    const last=[...db.transactions].sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
-    document.getElementById('dsm-batch').value=parseInt(last.batch)+1;
-  }
-}
 
 async function saveDSM(){
   const tid=document.getElementById('dsm-tid').value.trim();
+  const customer=document.getElementById('dsm-cust').value||'Fleet Card';
   const batch=document.getElementById('dsm-batch').value.trim();
   const date=document.getElementById('dsm-date').value;
   const amount=parseFloat(document.getElementById('dsm-amount').value);
@@ -415,72 +492,35 @@ async function saveDSM(){
   if(!batch)return toast('Enter batch number','err');
   if(!date)return toast('Select a date','err');
   if(!amount||amount<=0)return toast('Enter a valid amount','err');
-  const entry={id:uid(),tid,batch,date,amount,createdAt:new Date().toISOString()};
+  const entry={id:uid(),tid,customer,batch,date,amount,createdAt:new Date().toISOString()};
   db.transactions.push(entry);
-  document.getElementById('dsm-batch').value=parseInt(batch)+1;
   document.getElementById('dsm-amount').value='';
-  toast(`Saved ✓  Batch #${batch}  ${fmtAmt(amount)}`);
+  toast(`Saved ✓  ${customer}  Batch #${batch}  ${fmtAmt(amount)}`);
   refreshDSM();saveLocal();
-  setSyncStatus('syncing');
-  await apiPost({action:'saveTransaction',data:entry});
-  setSyncStatus('ok');
-}
-
-async function delTxn(id){
-  if(!confirm('Delete this entry?'))return;
-  db.transactions=db.transactions.filter(t=>t.id!==id);
-  refreshDSM();saveLocal();toast('Deleted','err');
-  setSyncStatus('syncing');
-  await apiPost({action:'deleteTransaction',id});
-  setSyncStatus('ok');
-}
-
-function editTxn(id){
-  const t=db.transactions.find(x=>x.id===id);if(!t)return;
-  const opts=(db.tids||[]).map(x=>`<option${x===t.tid?' selected':''}>${x}</option>`).join('');
-  showModal(`<div style="font-size:16px;font-weight:700;margin-bottom:16px;">✏️ Edit Batch Entry</div>
-    <div class="form-row"><label>TID</label><select id="et-tid">${opts}</select></div>
-    <div class="form-row-2">
-      <div><label>Batch No.</label><input type="number" id="et-batch" value="${t.batch}" min="1"></div>
-      <div><label>Date</label><input type="date" id="et-date" value="${t.date}"></div>
-    </div>
-    <div class="form-row"><label>Amount (₹)</label><input type="number" id="et-amount" value="${t.amount}" min="0" step="0.01"></div>
-    <div style="display:flex;gap:9px;margin-top:6px;">
-      <button class="btn btn-primary" onclick="saveEditTxn('${id}')">✓ Save</button>
-      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-    </div>`);
-}
-async function saveEditTxn(id){
-  const tid=document.getElementById('et-tid').value;
-  const batch=document.getElementById('et-batch').value.trim();
-  const date=document.getElementById('et-date').value;
-  const amount=parseFloat(document.getElementById('et-amount').value);
-  if(!tid||!batch||!date||!amount||amount<=0)return toast('Fill all fields','err');
-  const i=db.transactions.findIndex(t=>t.id===id);
-  if(i>=0)db.transactions[i]={...db.transactions[i],tid,batch,date,amount};
-  closeModal();refreshDSM();saveLocal();toast('Updated ✓');
-  setSyncStatus('syncing');
-  await apiPost({action:'updateTransaction',data:db.transactions[i>=0?i:0]});
-  setSyncStatus('ok');
+  setSyncStatus('syncing');await apiPost({action:'saveTransaction',data:entry});setSyncStatus('ok');
 }
 
 function refreshDSM(){
   const today=todayStr();
   const todayT=db.transactions.filter(t=>t.date===today).reverse();
   const recentT=db.transactions.filter(t=>t.date!==today).reverse().slice(0,40);
-  document.getElementById('today-count').textContent=`${todayT.length} batch${todayT.length!==1?'es':''}`;
-  document.getElementById('dsm-today').innerHTML=todayT.length?todayT.map(t=>eHTML(t,true)).join(''):'<div class="empty"><div class="ico">📋</div><p>No entries today</p></div>';
+  document.getElementById('today-count').textContent=`${todayT.length} entr${todayT.length!==1?'ies':'y'}`;
+  document.getElementById('dsm-today').innerHTML=todayT.length?todayT.map(t=>txnHTML(t,true)).join(''):'<div class="empty"><div class="ico">📋</div><p>No entries today</p></div>';
   const rl=document.getElementById('dsm-recent');
   document.getElementById('recent-count').textContent=recentT.length?`${recentT.length} entries`:'';
   if(!recentT.length){rl.innerHTML='';return;}
   const g={};recentT.forEach(t=>{if(!g[t.date])g[t.date]=[];g[t.date].push(t);});
-  rl.innerHTML=Object.entries(g).map(([d,es])=>`<div class="dg-header">📅 ${fmtDate(d)}</div>`+es.map(t=>eHTML(t,false)).join('')).join('');
+  rl.innerHTML=Object.entries(g).map(([d,es])=>`<div class="dg-hdr">📅 ${fmtDate(d)}</div>`+es.map(t=>txnHTML(t,false)).join('')).join('');
 }
-function eHTML(t,showDel){
+
+function txnHTML(t,showDel){
   return`<div class="entry-item">
     <div class="entry-top">
-      <div><div class="e-tid">${t.tid}</div><div class="e-meta">📅 ${fmtDate(t.date)}</div></div>
-      <div><div class="e-amt">${fmtAmt(t.amount)}</div><div class="e-batch">Batch #${t.batch}</div></div>
+      <div>
+        <div class="e-main">${t.tid} · Batch #${t.batch}</div>
+        <div class="e-sub">👤 ${t.customer||'Fleet Card'} · 📅 ${fmtDate(t.date)}</div>
+      </div>
+      <div><div class="e-amt debit">${fmtAmt(t.amount)}</div><div class="e-meta">Debit</div></div>
     </div>
     <div class="entry-actions">
       <button class="btn btn-sm btn-edit" onclick="editTxn('${t.id}')">✏️ Edit</button>
@@ -489,138 +529,391 @@ function eHTML(t,showDel){
   </div>`;
 }
 
+function editTxn(id){
+  const t=db.transactions.find(x=>x.id===id);if(!t)return;
+  const tOpts=(db.tids||[]).map(x=>`<option${x===t.tid?' selected':''}>${x}</option>`).join('');
+  const custs=['Fleet Card',...(db.customers||[])];
+  const cOpts=custs.map(c=>`<option${c===t.customer?' selected':''}>${c}</option>`).join('');
+  showModal(`<div style="font-size:16px;font-weight:700;margin-bottom:14px;">✏️ Edit Debit Entry</div>
+    <div class="form-row"><label>TID</label><select id="et-tid">${tOpts}</select></div>
+    <div class="form-row"><label>Customer</label><select id="et-cust">${cOpts}</select></div>
+    <div class="form-row-2">
+      <div><label>Batch No.</label><input type="number" id="et-batch" value="${t.batch}" min="1"></div>
+      <div><label>Date</label><input type="date" id="et-date" value="${t.date}"></div>
+    </div>
+    <div class="form-row"><label>Amount (₹)</label><input type="number" id="et-amount" value="${t.amount}" min="0" step="0.01"></div>
+    <div style="display:flex;gap:9px;">
+      <button class="btn btn-primary" onclick="saveEditTxn('${id}')">✓ Save</button>
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    </div>`);
+}
+async function saveEditTxn(id){
+  const tid=document.getElementById('et-tid').value;
+  const customer=document.getElementById('et-cust').value;
+  const batch=document.getElementById('et-batch').value.trim();
+  const date=document.getElementById('et-date').value;
+  const amount=parseFloat(document.getElementById('et-amount').value);
+  if(!tid||!batch||!date||!amount||amount<=0)return toast('Fill all fields','err');
+  const i=db.transactions.findIndex(t=>t.id===id);
+  if(i>=0)db.transactions[i]={...db.transactions[i],tid,customer,batch,date,amount};
+  closeModal();refreshDSM();saveLocal();toast('Updated ✓');
+  setSyncStatus('syncing');await apiPost({action:'updateTransaction',data:db.transactions[i>=0?i:0]});setSyncStatus('ok');
+}
+async function delTxn(id){
+  if(!confirm('Delete this entry?'))return;
+  db.transactions=db.transactions.filter(t=>t.id!==id);
+  refreshDSM();saveLocal();toast('Deleted','err');
+  setSyncStatus('syncing');await apiPost({action:'deleteTransaction',id});setSyncStatus('ok');
+}
+
 // ── RECEIVED ───────────────────────────────────────────────────────────────
 document.getElementById('recv-date').value=todayStr();
 
 async function saveRecv(){
+  const customer=document.getElementById('recv-cust').value||'Fleet Card';
+  const batch=document.getElementById('recv-batch').value.trim();
   const date=document.getElementById('recv-date').value;
   const amount=parseFloat(document.getElementById('recv-amount').value);
   const note=document.getElementById('recv-note').value.trim();
+  if(!batch)return toast('Enter batch number','err');
   if(!date)return toast('Select a date','err');
-  if(!amount||amount<=0)return toast('Enter received amount','err');
-  const entry={id:uid(),date,amount,note,savedAt:new Date().toISOString()};
+  if(!amount||amount<=0)return toast('Enter a valid amount','err');
+  const entry={id:uid(),customer,batch,date,amount,note,savedAt:new Date().toISOString()};
   db.received.push(entry);
   document.getElementById('recv-amount').value='';
+  document.getElementById('recv-batch').value='';
   document.getElementById('recv-note').value='';
-  toast(`Saved — ${fmtAmt(amount)}`);
+  toast(`Saved ✓  ${customer}  ${fmtAmt(amount)}`);
   refreshRecv();saveLocal();
-  setSyncStatus('syncing');
-  await apiPost({action:'saveReceived',data:entry});
-  setSyncStatus('ok');
+  setSyncStatus('syncing');await apiPost({action:'saveReceived',data:entry});setSyncStatus('ok');
 }
-async function delRecv(id){
-  if(!confirm('Delete this received entry?'))return;
-  db.received=db.received.filter(r=>r.id!==id);
-  refreshRecv();saveLocal();toast('Deleted','err');
-  setSyncStatus('syncing');
-  await apiPost({action:'deleteReceived',id});
-  setSyncStatus('ok');
+
+function refreshRecv(){
+  const totalDr=db.transactions.reduce((s,t)=>s+t.amount,0);
+  const totalCr=db.received.reduce((s,r)=>s+r.amount,0);
+  const bal=db.openingBalance+totalCr-totalDr;
+  document.getElementById('ov-dr').textContent=fmtAmt(totalDr);
+  document.getElementById('ov-cr').textContent=fmtAmt(totalCr);
+  document.getElementById('ov-bal').textContent=fmtAmt(bal);
+  document.getElementById('ov-ob').textContent=fmtAmt(db.openingBalance);
+
+  const sorted=[...db.received].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
+  document.getElementById('recv-count').textContent=`${db.received.length} entr${db.received.length!==1?'ies':'y'}`;
+  document.getElementById('recv-list').innerHTML=sorted.length?sorted.map(r=>`
+    <div class="entry-item">
+      <div class="entry-top">
+        <div>
+          <div class="e-main">Batch #${r.batch}</div>
+          <div class="e-sub">👤 ${r.customer||'Fleet Card'} · 📅 ${fmtDate(r.date)}${r.note?' · '+r.note:''}</div>
+        </div>
+        <div><div class="e-amt credit">${fmtAmt(r.amount)}</div><div class="e-meta">Credit</div></div>
+      </div>
+      <div class="entry-actions">
+        <button class="btn btn-sm btn-edit" onclick="editRecv('${r.id}')">✏️ Edit</button>
+        <button class="btn btn-sm btn-del" onclick="delRecv('${r.id}')">✕ Delete</button>
+      </div>
+    </div>`).join(''):'<div class="empty"><div class="ico">💳</div><p>No received entries yet</p></div>';
 }
+
 function editRecv(id){
   const r=db.received.find(x=>x.id===id);if(!r)return;
-  showModal(`<div style="font-size:16px;font-weight:700;margin-bottom:16px;">✏️ Edit Received Entry</div>
-    <div class="form-row"><label>Credit Date</label><input type="date" id="er-date" value="${r.date}"></div>
-    <div class="form-row"><label>Amount Received (₹)</label>
-      <div class="big-amt-wrap"><span class="big-rupee">₹</span><input type="number" id="er-amount" class="big-amt" value="${r.amount}" min="0" step="0.01"></div>
+  const custs=['Fleet Card',...(db.customers||[])];
+  const cOpts=custs.map(c=>`<option${c===r.customer?' selected':''}>${c}</option>`).join('');
+  showModal(`<div style="font-size:16px;font-weight:700;margin-bottom:14px;">✏️ Edit Credit Entry</div>
+    <div class="form-row"><label>Customer</label><select id="er-cust">${cOpts}</select></div>
+    <div class="form-row-2">
+      <div><label>Batch No.</label><input type="number" id="er-batch" value="${r.batch}" min="1"></div>
+      <div><label>Date</label><input type="date" id="er-date" value="${r.date}"></div>
     </div>
-    <div class="form-row"><label>Note (optional)</label><input type="text" id="er-note" value="${r.note||''}"></div>
-    <div style="display:flex;gap:9px;margin-top:6px;">
-      <button class="btn btn-primary" onclick="saveEditRecv('${id}')">✓ Save</button>
+    <div class="form-row"><label>Amount (₹)</label><input type="number" id="er-amount" value="${r.amount}" min="0" step="0.01"></div>
+    <div class="form-row"><label>Note</label><input type="text" id="er-note" value="${r.note||''}"></div>
+    <div style="display:flex;gap:9px;">
+      <button class="btn btn-green" onclick="saveEditRecv('${id}')">✓ Save</button>
       <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
     </div>`);
 }
 async function saveEditRecv(id){
+  const customer=document.getElementById('er-cust').value;
+  const batch=document.getElementById('er-batch').value.trim();
   const date=document.getElementById('er-date').value;
   const amount=parseFloat(document.getElementById('er-amount').value);
   const note=document.getElementById('er-note').value.trim();
-  if(!date||!amount||amount<=0)return toast('Fill all fields','err');
+  if(!batch||!date||!amount||amount<=0)return toast('Fill all fields','err');
   const i=db.received.findIndex(r=>r.id===id);
-  if(i>=0)db.received[i]={...db.received[i],date,amount,note};
+  if(i>=0)db.received[i]={...db.received[i],customer,batch,date,amount,note};
   closeModal();refreshRecv();saveLocal();toast('Updated ✓');
-  setSyncStatus('syncing');
-  await apiPost({action:'updateReceived',data:db.received[i>=0?i:0]});
-  setSyncStatus('ok');
+  setSyncStatus('syncing');await apiPost({action:'updateReceived',data:db.received[i>=0?i:0]});setSyncStatus('ok');
+}
+async function delRecv(id){
+  if(!confirm('Delete this entry?'))return;
+  db.received=db.received.filter(r=>r.id!==id);
+  refreshRecv();saveLocal();toast('Deleted','err');
+  setSyncStatus('syncing');await apiPost({action:'deleteReceived',id});setSyncStatus('ok');
 }
 
-function refreshRecv(){
-  const m=computeMatch();
-  document.getElementById('ov-total').textContent=fmtAmt(m.totalBatches);
-  document.getElementById('ov-recv').textContent=fmtAmt(m.totalReceived);
-  document.getElementById('ov-pending').textContent=fmtAmt(m.totalPending);
-  document.getElementById('ov-cnt').textContent=m.pendingCount;
+// ── REPORT ─────────────────────────────────────────────────────────────────
+let curFilter='today';
+function setFilter(f,el){curFilter=f;document.querySelectorAll('#rep-chips .chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');document.getElementById('rep-custom').style.display=f==='custom'?'block':'none';refreshReport();}
 
-  const sorted=[...db.received].sort((a,b)=>b.date.localeCompare(a.date));
-  document.getElementById('recv-count').textContent=`${sorted.length} entr${sorted.length!==1?'ies':'y'}`;
-  document.getElementById('recv-list').innerHTML=!sorted.length
-    ?'<div class="empty"><div class="ico">💳</div><p>No received entries yet</p></div>'
-    :sorted.map(r=>`<div class="recv-entry">
-        <div class="recv-header"><div class="recv-label">${fmtAmt(r.amount)}</div><span class="badge bb">BPCL Credit</span></div>
-        <div class="recv-sub">📅 ${fmtDate(r.date)}${r.note?' · '+r.note:''}</div>
-        <div class="recv-actions">
-          <button class="btn btn-sm btn-edit" onclick="editRecv('${r.id}')">✏️ Edit</button>
-          <button class="btn btn-sm btn-del" onclick="delRecv('${r.id}')">✕ Delete</button>
-        </div>
-      </div>`).join('');
+function getFilteredEntries(){
+  const today=todayStr(),now=new Date();
+  let txns=[...db.transactions];
+  let recv=[...db.received];
+  const filterDate=(arr,dateField)=>{
+    if(curFilter==='today')return arr.filter(x=>x[dateField]===today);
+    if(curFilter==='week'){const w=new Date(now);w.setDate(w.getDate()-7);return arr.filter(x=>new Date(x[dateField])>=w);}
+    if(curFilter==='month')return arr.filter(x=>x[dateField].startsWith(today.slice(0,7)));
+    if(curFilter==='custom'){
+      const f=document.getElementById('rep-from').value,t=document.getElementById('rep-to').value;
+      return arr.filter(x=>(!f||x[dateField]>=f)&&(!t||x[dateField]<=t));
+    }
+    return arr;
+  };
+  txns=filterDate(txns,'date');recv=filterDate(recv,'date');
+  const tid=document.getElementById('rep-tid').value;
+  if(tid!=='ALL')txns=txns.filter(t=>t.tid===tid);
+  const cust=document.getElementById('rep-cust').value;
+  if(cust!=='ALL'){txns=txns.filter(t=>t.customer===cust);recv=recv.filter(r=>r.customer===cust);}
+  return{txns,recv};
+}
 
-  // Match display
-  const ml=document.getElementById('match-list');
-  document.getElementById('match-count').textContent=`${m.settledCount} settled · ${m.pendingCount} pending`;
-  if(!m.batches.length){ml.innerHTML='<div class="empty"><div class="ico">🔍</div><p>No batches entered yet</p></div>';return;}
-  const pct=m.totalBatches>0?Math.min(100,((m.totalBatches-m.totalPending)/m.totalBatches)*100).toFixed(1):0;
-  const bc=pct>=100?'#10B981':pct>=50?'#F59E0B':'#EF4444';
-  let html=`<div class="card" style="margin-bottom:13px;padding:16px;">
-    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-      <span style="font-size:12px;font-weight:700;color:var(--muted);">BATCHES SETTLED</span>
-      <span style="font-size:14px;font-weight:700;color:${bc};">${pct}%</span>
-    </div>
-    <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%;background:${bc};"></div></div>
-    <div style="display:flex;justify-content:space-between;margin-top:6px;">
-      <span style="font-size:11px;color:var(--muted);">${m.settledCount} of ${m.batches.length} batches settled</span>
-      <span style="font-size:11px;color:var(--muted);">${fmtAmt(m.totalBatches-m.totalPending)} of ${fmtAmt(m.totalBatches)}</span>
-    </div>
+function refreshReport(){
+  populateDropdowns();
+  const {txns,recv}=getFilteredEntries();
+  const totalDr=txns.reduce((s,t)=>s+t.amount,0);
+  const totalCr=recv.reduce((s,r)=>s+r.amount,0);
+  const bal=totalCr-totalDr;
+  document.getElementById('rt-dr').textContent=fmtAmt(totalDr);
+  document.getElementById('rt-cr').textContent=fmtAmt(totalCr);
+  document.getElementById('rt-bal').textContent=fmtAmt(bal);
+  document.getElementById('rt-cnt').textContent=txns.length+recv.length;
+
+  const combined=[
+    ...txns.map(t=>({...t,type:'debit'})),
+    ...recv.map(r=>({...r,type:'credit'}))
+  ].sort((a,b)=>a.date.localeCompare(b.date)||(a.createdAt||a.savedAt||'').localeCompare(b.createdAt||b.savedAt||''));
+
+  const tbl=document.getElementById('rep-tbl');
+  if(!combined.length){tbl.innerHTML='<div class="empty"><div class="ico">📊</div><p>No data</p></div>';return;}
+  let h=`<table class="tbl"><thead><tr><th>Date</th><th>TID</th><th>Batch</th><th>Particulars</th><th>Debit</th><th>Credit</th></tr></thead><tbody>`;
+  combined.forEach(e=>{
+    const isD=e.type==='debit';
+    h+=`<tr>
+      <td style="white-space:nowrap;">${fmtDate(e.date)}</td>
+      <td style="font-family:'Roboto Mono',monospace;font-size:11px;">${e.tid||'—'}</td>
+      <td style="font-family:'Roboto Mono',monospace;font-weight:700;">#${e.batch}</td>
+      <td style="font-weight:600;">${e.customer||'Fleet Card'}</td>
+      <td style="font-family:'Roboto Mono',monospace;color:var(--red);font-weight:700;">${isD?fmtAmt(e.amount):'—'}</td>
+      <td style="font-family:'Roboto Mono',monospace;color:var(--green);font-weight:700;">${!isD?fmtAmt(e.amount):'—'}</td>
+    </tr>`;
+  });
+  h+=`</tbody><tfoot><tr><td colspan="4">TOTAL</td><td style="font-family:'Roboto Mono',monospace;">${fmtAmt(totalDr)}</td><td style="font-family:'Roboto Mono',monospace;">${fmtAmt(totalCr)}</td></tr></tfoot></table>`;
+  tbl.innerHTML=h;
+}
+
+// ── LEDGER ─────────────────────────────────────────────────────────────────
+function generateLedger(){
+  const from=document.getElementById('led-from').value;
+  const to=document.getElementById('led-to').value;
+  const tid=document.getElementById('led-tid').value;
+  const cust=document.getElementById('led-cust').value;
+  if(!from||!to)return toast('Select date range','err');
+  if(from>to)return toast('From date must be before To date','err');
+
+  let txns=db.transactions.filter(t=>t.date>=from&&t.date<=to);
+  let recv=db.received.filter(r=>r.date>=from&&r.date<=to);
+  if(tid!=='ALL')txns=txns.filter(t=>t.tid===tid);
+  if(cust!=='ALL'){txns=txns.filter(t=>t.customer===cust);recv=recv.filter(r=>r.customer===cust);}
+
+  const combined=[
+    ...txns.map(t=>({...t,type:'debit'})),
+    ...recv.map(r=>({...r,type:'credit'}))
+  ].sort((a,b)=>a.date.localeCompare(b.date)||(a.createdAt||a.savedAt||'').localeCompare(b.createdAt||b.savedAt||''));
+
+  const ob=db.openingBalance;
+  let bal=ob;
+  const totalDr=txns.reduce((s,t)=>s+t.amount,0);
+  const totalCr=recv.reduce((s,r)=>s+r.amount,0);
+  const closingBal=ob+totalCr-totalDr;
+
+  // Update banner
+  document.getElementById('led-ob').textContent=fmtAmt(ob);
+  const cbEl=document.getElementById('led-cb');
+  cbEl.textContent=fmtAmt(Math.abs(closingBal))+(closingBal<0?' (Dr)':closingBal>0?' (Cr)':'');
+  cbEl.className='bal-val '+(closingBal<0?'neg':closingBal>0?'pos':'zero');
+  const net=totalCr-totalDr;
+  const netEl=document.getElementById('led-net');
+  netEl.textContent=fmtAmt(Math.abs(net))+(net<0?' Dr':net>0?' Cr':'');
+  netEl.className='bal-val '+(net<0?'neg':net>0?'pos':'zero');
+
+  let rows=`<div class="ledger-row opening">
+    <span class="lr-date"></span>
+    <span class="lr-particulars" style="grid-column:1/4;font-weight:700;color:var(--navy);">OPENING BALANCE</span>
+    <span></span>
+    <span class="lr-balance" style="color:var(--blue);">${fmtAmt(ob)}</span>
   </div>`;
 
-  const pending=m.batches.filter(b=>b.status==='pending');
-  const settled=m.batches.filter(b=>b.status==='settled');
-
-  if(pending.length){
-    html+=`<div class="match-title"><span>🔴</span> Pending Batches (${pending.length})</div>`;
-    html+=pending.map(b=>`<div class="batch-row pending">
-      <div>
-        <div class="br-num">Batch #${b.batch}</div>
-        <div class="br-tid">${b.tid}</div>
-        <div class="br-meta">📅 ${fmtDate(b.date)}</div>
-      </div>
-      <div class="br-right">
-        <div class="br-amt">${fmtAmt(b.amount)}</div>
-        <div class="br-status" style="color:var(--orange);">❌ Not received</div>
-      </div>
-    </div>`).join('');
-  }
-
-  if(settled.length){
-    html+=`<div class="match-title" style="margin-top:14px;"><span>🟢</span> Settled Batches (${settled.length})</div>`;
-    html+=settled.map(b=>`<div class="batch-row settled">
-      <div>
-        <div class="br-num">Batch #${b.batch}</div>
-        <div class="br-tid">${b.tid}</div>
-        <div class="br-meta">📅 ${fmtDate(b.date)}</div>
-      </div>
-      <div class="br-right">
-        <div class="br-amt">${fmtAmt(b.amount)}</div>
-        <div class="br-status" style="color:var(--green);">✅ Settled</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:2px;">Cr: ${fmtDate(b.receivedDate)}</div>
-      </div>
-    </div>`).join('');
-  }
-
-  if(m.unmatchedReceived.length){
-    html+=`<div style="background:#DBEAFE;border-radius:11px;padding:13px;margin-top:10px;border:1.5px solid #93C5FD;">
-      <div style="font-size:13px;font-weight:700;color:#1D4ED8;">ℹ️ ${m.unmatchedReceived.length} Unmatched Credit${m.unmatchedReceived.length>1?'s':''}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px;">These received amounts don't match any pending batch exactly.</div>
+  combined.forEach(e=>{
+    const isD=e.type==='debit';
+    if(isD)bal-=e.amount; else bal+=e.amount;
+    const balColor=bal<0?'color:var(--red);':bal===0?'':'color:var(--navy);';
+    rows+=`<div class="ledger-row">
+      <span class="lr-date">${fmtDate(e.date)}</span>
+      <span style="display:flex;flex-direction:column;gap:2px;">
+        <span class="lr-particulars">${e.customer||'Fleet Card'}</span>
+        <span class="lr-batch">${e.tid||''} · #${e.batch}</span>
+      </span>
+      <span class="lr-debit">${isD?fmtAmt(e.amount):'—'}</span>
+      <span class="lr-credit">${!isD?fmtAmt(e.amount):'—'}</span>
+      <span class="lr-balance" style="${balColor}">${fmtAmt(Math.abs(bal))}${bal<0?' Dr':bal>0?' Cr':''}</span>
     </div>`;
-  }
-  ml.innerHTML=html;
+  });
+
+  rows+=`<div class="ledger-row subtotal">
+    <span></span><span style="font-weight:700;color:var(--navy);">SUB TOTAL</span>
+    <span class="lr-debit">${fmtAmt(totalDr)}</span>
+    <span class="lr-credit">${fmtAmt(totalCr)}</span>
+    <span></span>
+  </div>
+  <div class="ledger-row total-row">
+    <span></span><span>TOTAL</span>
+    <span class="lr-debit" style="color:#FCA5A5;">${fmtAmt(Math.max(totalDr,totalCr))}</span>
+    <span class="lr-credit" style="color:#6EE7B7;">${fmtAmt(Math.max(totalDr,totalCr))}</span>
+    <span></span>
+  </div>
+  <div class="ledger-row closing">
+    <span></span>
+    <span style="font-weight:800;">CLOSING BALANCE</span>
+    <span></span><span></span>
+    <span class="lr-balance" style="${closingBal<0?'color:#FCA5A5;':closingBal>0?'color:#6EE7B7;':'color:#fff;'}">${fmtAmt(Math.abs(closingBal))}${closingBal<0?' Dr':closingBal>0?' Cr':''}</span>
+  </div>`;
+
+  document.getElementById('ledger-rows').innerHTML=rows;
+  document.getElementById('ledger-output').style.display='block';
+  document.getElementById('ledger-output').scrollIntoView({behavior:'smooth'});
+  toast('Ledger generated ✓');
+}
+
+// ── EXPORT EXCEL ───────────────────────────────────────────────────────────
+function exportExcel(){
+  const {txns,recv}=getFilteredEntries();
+  if(!txns.length&&!recv.length)return toast('No data','err');
+  const combined=[...txns.map(t=>({...t,type:'debit'})),...recv.map(r=>({...r,type:'credit'}))].sort((a,b)=>a.date.localeCompare(b.date));
+  const data=[['Date','TID','Batch #','Particulars','Debit (₹)','Credit (₹)']];
+  combined.forEach(e=>{data.push([fmtDate(e.date),e.tid||'—','#'+e.batch,e.customer||'Fleet Card',e.type==='debit'?e.amount:'',e.type==='credit'?e.amount:'']);});
+  const totalDr=txns.reduce((s,t)=>s+t.amount,0),totalCr=recv.reduce((s,r)=>s+r.amount,0);
+  data.push([]);data.push(['TOTAL','','','',totalDr,totalCr]);
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=[12,14,10,22,14,14].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb,ws,'Fleet Card Report');
+  XLSX.writeFile(wb,`FleetCard_Report_${todayStr()}.xlsx`);
+  toast('Excel downloaded!');
+}
+
+function exportLedgerExcel(){
+  const from=document.getElementById('led-from').value,to=document.getElementById('led-to').value;
+  const tid=document.getElementById('led-tid').value,cust=document.getElementById('led-cust').value;
+  let txns=db.transactions.filter(t=>t.date>=from&&t.date<=to);
+  let recv=db.received.filter(r=>r.date>=from&&r.date<=to);
+  if(tid!=='ALL')txns=txns.filter(t=>t.tid===tid);
+  if(cust!=='ALL'){txns=txns.filter(t=>t.customer===cust);recv=recv.filter(r=>r.customer===cust);}
+  const combined=[...txns.map(t=>({...t,type:'debit'})),...recv.map(r=>({...r,type:'credit'}))].sort((a,b)=>a.date.localeCompare(b.date));
+  const ob=db.openingBalance;let bal=ob;
+  const data=[['Date','TID','Batch #','Particulars','Debit (₹)','Credit (₹)','Balance (₹)']];
+  data.push(['','','','OPENING BALANCE','','',ob]);
+  combined.forEach(e=>{
+    const isD=e.type==='debit';
+    if(isD)bal-=e.amount;else bal+=e.amount;
+    data.push([fmtDate(e.date),e.tid||'—','#'+e.batch,e.customer||'Fleet Card',isD?e.amount:'',!isD?e.amount:'',bal]);
+  });
+  const totalDr=txns.reduce((s,t)=>s+t.amount,0),totalCr=recv.reduce((s,r)=>s+r.amount,0);
+  data.push([]);data.push(['SUB TOTAL','','','',totalDr,totalCr,'']);
+  data.push(['CLOSING BALANCE','','','','','',ob+totalCr-totalDr]);
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=[12,14,10,22,14,14,14].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb,ws,'Ledger');
+  XLSX.writeFile(wb,`FleetCard_Ledger_${from}_to_${to}.xlsx`);
+  toast('Ledger Excel downloaded!');
+}
+
+// ── EXPORT PDF ─────────────────────────────────────────────────────────────
+function exportPDF(){
+  const {txns,recv}=getFilteredEntries();
+  if(!txns.length&&!recv.length)return toast('No data','err');
+  const combined=[...txns.map(t=>({...t,type:'debit'})),...recv.map(r=>({...r,type:'credit'}))].sort((a,b)=>a.date.localeCompare(b.date));
+  const totalDr=txns.reduce((s,t)=>s+t.amount,0),totalCr=recv.reduce((s,r)=>s+r.amount,0);
+  let rows='';combined.forEach(e=>{
+    const isD=e.type==='debit';
+    rows+=`<tr><td>${fmtDate(e.date)}</td><td>${e.tid||'—'}</td><td>#${e.batch}</td><td>${e.customer||'Fleet Card'}</td><td style="color:#DC2626;font-family:monospace;font-weight:700;">${isD?'₹'+e.amount.toLocaleString('en-IN',{minimumFractionDigits:2}):''}</td><td style="color:#059669;font-family:monospace;font-weight:700;">${!isD?'₹'+e.amount.toLocaleString('en-IN',{minimumFractionDigits:2}):''}</td></tr>`;
+  });
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>Fleet Card Report</title>
+  <style>body{font-family:Arial,sans-serif;font-size:12px;padding:24px;}h1{font-size:18px;margin-bottom:4px;}
+  .meta{color:#888;font-size:11px;margin-bottom:14px;}.summary{display:flex;gap:10px;margin-bottom:16px;}
+  .sbox{background:#F5FAFE;border:1px solid #D1E4EE;border-radius:8px;padding:10px 14px;flex:1;}
+  .sval{font-size:15px;font-weight:700;font-family:monospace;}.slbl{font-size:10px;color:#888;text-transform:uppercase;margin-top:2px;}
+  table{width:100%;border-collapse:collapse;}th{background:#0C3547;color:#fff;padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;}
+  td{padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;}tr:nth-child(even) td{background:#F8FBFD;}
+  tfoot td{background:#164E63!important;color:#fff!important;font-weight:700;}
+  .btn{background:#0369A1;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:700;margin-top:18px;}
+  @media print{.btn{display:none;}}</style></head><body>
+  <h1>⛽ FLEET CARD TRANSACTION REPORT</h1>
+  <div class="meta">Generated: ${new Date().toLocaleString('en-IN')}</div>
+  <div class="summary">
+    <div class="sbox"><div class="sval" style="color:#DC2626;">₹${totalDr.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Debit</div></div>
+    <div class="sbox"><div class="sval" style="color:#059669;">₹${totalCr.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Credit</div></div>
+    <div class="sbox"><div class="sval" style="color:#0369A1;">₹${Math.abs(totalCr-totalDr).toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Balance</div></div>
+  </div>
+  <table><thead><tr><th>Date</th><th>TID</th><th>Batch #</th><th>Particulars</th><th>Debit</th><th>Credit</th></tr></thead>
+  <tbody>${rows}</tbody>
+  <tfoot><tr><td colspan="4">TOTAL</td><td style="font-family:monospace;">₹${totalDr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;">₹${totalCr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr></tfoot></table>
+  <button class="btn" onclick="window.print()">🖨 Print / Save PDF</button></body></html>`);
+  w.document.close();toast('PDF opened!');
+}
+
+function exportLedgerPDF(){
+  const from=document.getElementById('led-from').value,to=document.getElementById('led-to').value;
+  const tid=document.getElementById('led-tid').value,cust=document.getElementById('led-cust').value;
+  let txns=db.transactions.filter(t=>t.date>=from&&t.date<=to);
+  let recv=db.received.filter(r=>r.date>=from&&r.date<=to);
+  if(tid!=='ALL')txns=txns.filter(t=>t.tid===tid);
+  if(cust!=='ALL'){txns=txns.filter(t=>t.customer===cust);recv=recv.filter(r=>r.customer===cust);}
+  const combined=[...txns.map(t=>({...t,type:'debit'})),...recv.map(r=>({...r,type:'credit'}))].sort((a,b)=>a.date.localeCompare(b.date));
+  const ob=db.openingBalance;let bal=ob;
+  const totalDr=txns.reduce((s,t)=>s+t.amount,0),totalCr=recv.reduce((s,r)=>s+r.amount,0);
+  const cb=ob+totalCr-totalDr;
+  let rows=`<tr style="background:#EFF6FF;"><td colspan="4" style="font-weight:700;">OPENING BALANCE</td><td></td><td></td><td style="font-family:monospace;font-weight:700;color:#0369A1;">₹${ob.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>`;
+  combined.forEach(e=>{
+    const isD=e.type==='debit';
+    if(isD)bal-=e.amount;else bal+=e.amount;
+    const bc=bal<0?'#DC2626':bal>0?'#0C3547':'#888';
+    rows+=`<tr><td>${fmtDate(e.date)}</td><td>${e.customer||'Fleet Card'}</td><td>${e.tid||'—'}</td><td>#${e.batch}</td><td style="color:#DC2626;font-family:monospace;font-weight:700;">${isD?'₹'+e.amount.toLocaleString('en-IN',{minimumFractionDigits:2}):''}</td><td style="color:#059669;font-family:monospace;font-weight:700;">${!isD?'₹'+e.amount.toLocaleString('en-IN',{minimumFractionDigits:2}):''}</td><td style="font-family:monospace;font-weight:700;color:${bc};">₹${Math.abs(bal).toLocaleString('en-IN',{minimumFractionDigits:2})}${bal<0?' Dr':bal>0?' Cr':''}</td></tr>`;
+  });
+  rows+=`<tr style="background:#F5FAFE;font-weight:700;"><td colspan="4">SUB TOTAL</td><td style="font-family:monospace;color:#DC2626;">₹${totalDr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;color:#059669;">₹${totalCr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td></td></tr>
+  <tr style="background:#164E63;color:#fff;font-weight:700;"><td colspan="4">TOTAL</td><td style="font-family:monospace;">₹${Math.max(totalDr,totalCr).toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;">₹${Math.max(totalDr,totalCr).toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td></td></tr>
+  <tr style="background:#0C3547;color:#fff;font-weight:800;"><td colspan="6">CLOSING BALANCE</td><td style="font-family:monospace;color:${cb<0?'#FCA5A5':cb>0?'#6EE7B7':'#fff'};">₹${Math.abs(cb).toLocaleString('en-IN',{minimumFractionDigits:2})} ${cb<0?'Dr':cb>0?'Cr':''}</td></tr>`;
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>Fleet Card Ledger</title>
+  <style>body{font-family:Arial,sans-serif;font-size:12px;padding:24px;}h1{font-size:18px;margin-bottom:4px;}
+  .meta{color:#888;font-size:11px;margin-bottom:14px;}.summary{display:flex;gap:10px;margin-bottom:16px;}
+  .sbox{background:#F5FAFE;border:1px solid #D1E4EE;border-radius:8px;padding:10px 14px;flex:1;text-align:center;}
+  .sval{font-size:15px;font-weight:700;font-family:monospace;}.slbl{font-size:10px;color:#888;text-transform:uppercase;margin-top:2px;}
+  table{width:100%;border-collapse:collapse;}th{background:#0C3547;color:#fff;padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;}
+  td{padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;}tr:nth-child(even) td{background:#F8FBFD;}
+  .btn{background:#0369A1;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:700;margin-top:18px;}
+  @media print{.btn{display:none;}}</style></head><body>
+  <h1>⛽ FLEET CARD — TRANSACTION LEDGER</h1>
+  <div class="meta">Period: ${fmtDate(from)} to ${fmtDate(to)} · Generated: ${new Date().toLocaleString('en-IN')}</div>
+  <div class="summary">
+    <div class="sbox"><div class="sval" style="color:#0369A1;">₹${ob.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Opening Balance</div></div>
+    <div class="sbox"><div class="sval" style="color:#DC2626;">₹${totalDr.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Debit</div></div>
+    <div class="sbox"><div class="sval" style="color:#059669;">₹${totalCr.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Credit</div></div>
+    <div class="sbox"><div class="sval" style="color:${cb<0?'#DC2626':cb>0?'#059669':'#333'};">₹${Math.abs(cb).toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Closing Balance</div></div>
+  </div>
+  <table><thead><tr><th>Date</th><th>Particulars</th><th>TID</th><th>Batch #</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead>
+  <tbody>${rows}</tbody></table>
+  <button class="btn" onclick="window.print()">🖨 Print / Save PDF</button></body></html>`);
+  w.document.close();toast('PDF opened!');
 }
 
 // ── MODAL ──────────────────────────────────────────────────────────────────
@@ -628,141 +921,16 @@ function showModal(html){document.getElementById('modal-body').innerHTML=html;do
 function closeModal(){document.getElementById('modal').classList.remove('open');}
 function maybeCloseModal(e){if(e.target===document.getElementById('modal'))closeModal();}
 
-// ── REPORT ─────────────────────────────────────────────────────────────────
-let curFilter='today';
-function setFilter(f,el){curFilter=f;document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');document.getElementById('custom-range').style.display=f==='custom'?'block':'none';refreshReport();}
-
-function getFilteredTxns(){
-  const today=todayStr(),now=new Date();
-  let txns=[...db.transactions];
-  if(curFilter==='today')txns=txns.filter(t=>t.date===today);
-  else if(curFilter==='week'){const w=new Date(now);w.setDate(w.getDate()-7);txns=txns.filter(t=>new Date(t.date)>=w);}
-  else if(curFilter==='month')txns=txns.filter(t=>t.date.startsWith(today.slice(0,7)));
-  else if(curFilter==='custom'){
-    const f=document.getElementById('rep-from').value,to=document.getElementById('rep-to').value;
-    if(f)txns=txns.filter(t=>t.date>=f);if(to)txns=txns.filter(t=>t.date<=to);
-  }
-  const tid=document.getElementById('rep-tid').value;
-  if(tid!=='ALL')txns=txns.filter(t=>t.tid===tid);
-  return txns.sort((a,b)=>a.date.localeCompare(b.date)||(parseInt(a.batch)-parseInt(b.batch)));
-}
-
-function refreshReport(){
-  const txns=getFilteredTxns();
-  const m=computeMatch();
-  const mm={};m.batches.forEach(b=>{mm[b.id]=b;});
-  const rows=txns.map(t=>mm[t.id]?mm[t.id]:{...t,status:'pending',receivedAmt:0});
-  const totalTxn=rows.reduce((s,r)=>s+r.amount,0);
-  const settledAmt=rows.filter(r=>r.status==='settled').reduce((s,r)=>s+r.amount,0);
-  const pendingAmt=rows.filter(r=>r.status==='pending').reduce((s,r)=>s+r.amount,0);
-  const pendingCnt=rows.filter(r=>r.status==='pending').length;
-  document.getElementById('rt-txn').textContent=fmtAmt(totalTxn);
-  document.getElementById('rt-settled').textContent=fmtAmt(settledAmt);
-  document.getElementById('rt-pending').textContent=fmtAmt(pendingAmt);
-  document.getElementById('rt-cnt').textContent=pendingCnt;
-
-  const bw=document.getElementById('rep-batch-tbl');
-  if(!rows.length){bw.innerHTML='<div class="empty"><div class="ico">📊</div><p>No data</p></div>';}
-  else{
-    let h=`<table class="tbl"><thead><tr><th>Date</th><th>TID</th><th>Batch #</th><th>Amount</th><th>Status</th><th>Credit Date</th></tr></thead><tbody>`;
-    rows.forEach(r=>{
-      const sc=r.status==='settled'?'bg':'br';
-      const sl=r.status==='settled'?'🟢 Settled':'🔴 Pending';
-      h+=`<tr><td style="white-space:nowrap;">${fmtDate(r.date)}</td><td style="font-family:'Roboto Mono',monospace;font-size:11px;">${r.tid}</td><td style="font-family:'Roboto Mono',monospace;font-weight:700;">#${r.batch}</td><td style="font-family:'Roboto Mono',monospace;">${fmtAmt(r.amount)}</td><td><span class="badge ${sc}" style="font-size:10px;">${sl}</span></td><td style="font-size:11px;color:var(--muted);">${r.receivedDate?fmtDate(r.receivedDate):'—'}</td></tr>`;
-    });
-    h+=`</tbody><tfoot><tr><td colspan="3">TOTAL (${rows.length} batches)</td><td style="font-family:'Roboto Mono',monospace;">${fmtAmt(totalTxn)}</td><td></td><td></td></tr></tfoot></table>`;
-    bw.innerHTML=h;
-  }
-
-  const rw=document.getElementById('rep-recv-tbl');
-  const rs=[...db.received].sort((a,b)=>a.date.localeCompare(b.date));
-  if(!rs.length){rw.innerHTML='<div class="empty"><div class="ico">💳</div><p>No received entries</p></div>';}
-  else{
-    let h=`<table class="tbl"><thead><tr><th>Credit Date</th><th>Amount</th><th>Note</th><th>Matched Batch</th></tr></thead><tbody>`;
-    rs.forEach(r=>{
-      const matchedBatch=m.batches.find(b=>b.status==='settled'&&b.receivedId===r.id);
-      h+=`<tr><td style="white-space:nowrap;">${fmtDate(r.date)}</td><td style="font-family:'Roboto Mono',monospace;font-weight:700;">${fmtAmt(r.amount)}</td><td style="font-size:11px;color:var(--muted);">${r.note||'—'}</td><td style="font-family:'Roboto Mono',monospace;font-weight:700;color:var(--green);">${matchedBatch?'#'+matchedBatch.batch:'⚠️ Unmatched'}</td></tr>`;
-    });
-    h+=`</tbody><tfoot><tr><td>TOTAL</td><td style="font-family:'Roboto Mono',monospace;">${fmtAmt(rs.reduce((s,r)=>s+r.amount,0))}</td><td></td><td></td></tr></tfoot></table>`;
-    rw.innerHTML=h;
-  }
-}
-
-// ── EXPORT EXCEL ───────────────────────────────────────────────────────────
-function exportExcel(){
-  const txns=getFilteredTxns();if(!txns.length)return toast('No data','err');
-  const m=computeMatch();const mm={};m.batches.forEach(b=>{mm[b.id]=b;});
-  const bData=txns.map(t=>{
-    const mb=mm[t.id]||{status:'pending'};
-    return{'Date':fmtDate(t.date),'TID':t.tid,'Batch #':'#'+t.batch,'Amount (₹)':t.amount,'Status':mb.status==='settled'?'🟢 Settled':'🔴 Pending','Credit Date':mb.receivedDate?fmtDate(mb.receivedDate):'—'};
-  });
-  const rs=[...db.received].sort((a,b)=>a.date.localeCompare(b.date));
-  const rData=rs.map(r=>{
-    const mb=m.batches.find(b=>b.status==='settled'&&b.receivedId===r.id);
-    return{'Credit Date':fmtDate(r.date),'Amount (₹)':r.amount,'Note':r.note||'','Matched Batch':mb?'#'+mb.batch:'Unmatched'};
-  });
-  const wb=XLSX.utils.book_new();
-  const ws1=XLSX.utils.json_to_sheet(bData);ws1['!cols']=[12,16,10,14,14,12].map(w=>({wch:w}));
-  XLSX.utils.book_append_sheet(wb,ws1,'Batch Transactions');
-  const ws2=XLSX.utils.json_to_sheet(rData);ws2['!cols']=[12,14,20,14].map(w=>({wch:w}));
-  XLSX.utils.book_append_sheet(wb,ws2,'BPCL Credits');
-  XLSX.writeFile(wb,`FleetCard_BPCL_${todayStr()}.xlsx`);
-  toast('Excel downloaded!');
-}
-
-// ── EXPORT PDF ─────────────────────────────────────────────────────────────
-function exportPDF(){
-  const txns=getFilteredTxns();if(!txns.length)return toast('No data','err');
-  const m=computeMatch();const mm={};m.batches.forEach(b=>{mm[b.id]=b;});
-  const tt=txns.reduce((s,t)=>s+t.amount,0);
-  const tr2=db.received.reduce((s,r)=>s+r.amount,0);
-  const bRows=txns.map(t=>{
-    const mb=mm[t.id]||{status:'pending'};
-    const sc=mb.status==='settled'?'#15803D':'#B91C1C';
-    return`<tr><td>${fmtDate(t.date)}</td><td>${t.tid}</td><td style="font-weight:700;">#${t.batch}</td><td>₹${t.amount.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="color:${sc};font-weight:700;">${mb.status==='settled'?'🟢 Settled':'🔴 Pending'}</td><td style="color:#7A90B0;">${mb.receivedDate?fmtDate(mb.receivedDate):'—'}</td></tr>`;
-  }).join('');
-  const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><title>Fleet Card BPCL Report</title>
-  <style>body{font-family:Arial,sans-serif;font-size:12px;padding:24px;color:#0B1E3D;}
-  h1{font-size:20px;margin-bottom:3px;}
-  .meta{color:#7A90B0;font-size:11px;margin-bottom:14px;}
-  .summary{display:flex;gap:10px;margin-bottom:18px;}
-  .sbox{background:#F8FAFD;border:1px solid #DDE5F0;border-radius:8px;padding:10px 14px;flex:1;}
-  .sval{font-size:15px;font-weight:700;font-family:monospace;}.slbl{font-size:10px;color:#7A90B0;text-transform:uppercase;margin-top:2px;}
-  table{width:100%;border-collapse:collapse;}
-  th{background:#0369A1;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;}
-  td{padding:8px 10px;border-bottom:1px solid #DDE5F0;font-size:12px;}tr:nth-child(even) td{background:#F8FAFD;}
-  tfoot td{background:#0C4A6E!important;color:#fff!important;font-weight:700;}
-  .btn{background:#0369A1;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;margin-top:20px;}
-  @media print{.btn{display:none;}}</style></head><body>
-  <h1>⛽ FLEET CARD — BPCL TRANSACTION REPORT</h1>
-  <div class="meta">Generated: ${new Date().toLocaleString('en-IN')}</div>
-  <div class="summary">
-    <div class="sbox"><div class="sval" style="color:#0369A1;">₹${tt.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Batches</div></div>
-    <div class="sbox"><div class="sval" style="color:#10B981;">₹${tr2.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Received</div></div>
-    <div class="sbox"><div class="sval" style="color:#0369A1;">${m.settledCount}/${m.batches.length}</div><div class="slbl">Batches Settled</div></div>
-  </div>
-  <table><thead><tr><th>Date</th><th>TID</th><th>Batch #</th><th>Amount</th><th>Status</th><th>Credit Date</th></tr></thead>
-  <tbody>${bRows}</tbody>
-  <tfoot><tr><td colspan="3">TOTAL (${txns.length})</td><td>₹${tt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td></td><td></td></tr></tfoot></table>
-  <button class="btn" onclick="window.print()">🖨 Print / Save as PDF</button>
-  </body></html>`);
-  w.document.close();toast('PDF opened!');
-}
-
 // ── RESET ──────────────────────────────────────────────────────────────────
 function showResetModal(){
-  showModal(`<div style="text-align:center;margin-bottom:18px;">
-    <div style="font-size:38px;margin-bottom:8px;">🔐</div>
-    <div style="font-size:17px;font-weight:800;color:var(--navy);margin-bottom:6px;">Reset All Data</div>
-    <div style="font-size:12px;color:var(--muted);line-height:1.7;">Permanently deletes all batch entries and received credits. TIDs will be kept.</div>
+  showModal(`<div style="text-align:center;margin-bottom:16px;"><div style="font-size:36px;margin-bottom:8px;">🔐</div>
+    <div style="font-size:16px;font-weight:800;margin-bottom:6px;">Reset All Data</div>
+    <div style="font-size:12px;color:var(--muted);">Deletes all transactions and received entries. TIDs, customers and opening balance are kept.</div>
   </div>
-  <div class="form-row"><label>Admin PIN</label>
-    <input type="password" id="reset-pin" placeholder="••••" maxlength="8" style="font-size:26px;text-align:center;letter-spacing:10px;font-family:'Roboto Mono',monospace;padding:14px;">
-  </div>
+  <div class="form-row"><label>Admin PIN</label><input type="password" id="reset-pin" placeholder="••••" maxlength="8" style="font-size:24px;text-align:center;letter-spacing:8px;font-family:'Roboto Mono',monospace;"></div>
   <div id="reset-err" style="color:var(--red);font-size:12px;font-weight:700;text-align:center;margin-bottom:10px;display:none;">❌ Incorrect PIN</div>
   <div style="display:flex;gap:9px;">
-    <button class="btn" style="background:linear-gradient(135deg,#EF4444,#DC2626);color:#fff;" onclick="confirmReset()">🗑 Reset</button>
+    <button class="btn btn-red" onclick="confirmReset()">🗑 Reset</button>
     <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
   </div>`);
   setTimeout(()=>{const p=document.getElementById('reset-pin');if(p)p.focus();},200);
@@ -771,10 +939,8 @@ async function confirmReset(){
   const pin=document.getElementById('reset-pin').value;
   if(pin!==RESET_PIN){document.getElementById('reset-err').style.display='block';document.getElementById('reset-pin').value='';return;}
   db.transactions=[];db.received=[];saveLocal();
-  closeModal();refreshDSM();refreshRecv();refreshReport();toast('Data cleared ✓');
-  setSyncStatus('syncing');
-  await apiPost({action:'resetAll'});
-  setSyncStatus('ok');
+  closeModal();refreshDSM();refreshRecv();toast('Data cleared ✓');
+  setSyncStatus('syncing');await apiPost({action:'resetAll'});setSyncStatus('ok');
 }
 
 // ── INIT ───────────────────────────────────────────────────────────────────
