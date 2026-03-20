@@ -322,6 +322,14 @@ let db = { tids:[], customers:[], transactions:[], received:[], openingBalance:0
 function todayStr(){return new Date().toISOString().split('T')[0];}
 function firstOfMonth(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;}
 function fmtAmt(n){return'₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtTime(ts){
+  if(!ts)return'';
+  try{
+    const d=new Date(ts);
+    if(isNaN(d.getTime()))return'';
+    return d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+  }catch{return'';}
+}
 function fmtDate(d){
   if(!d)return'—';const s=String(d);
   if(s.includes('/'))return s;
@@ -531,7 +539,7 @@ function txnHTML(t,showDel){
     <div class="entry-top">
       <div>
         <div class="e-main">${t.tid} · Batch #${t.batch}</div>
-        <div class="e-sub">👤 ${t.customer||'Fleet Card'} · 📅 ${fmtDate(t.date)}</div>
+        <div class="e-sub">👤 ${t.customer||'Fleet Card'} · 📅 ${fmtDate(t.date)}${t.createdAt?' · ⏱ '+fmtTime(t.createdAt):''}</div>
       </div>
       <div><div class="e-amt debit">${fmtAmt(t.amount)}</div><div class="e-meta">Debit</div></div>
     </div>
@@ -617,7 +625,7 @@ function refreshRecv(){
       <div class="entry-top">
         <div>
           <div class="e-main">Batch #${r.batch}</div>
-          <div class="e-sub">👤 ${r.customer||'Fleet Card'} · 📅 ${fmtDate(r.date)}${r.note?' · '+r.note:''}</div>
+          <div class="e-sub">👤 ${r.customer||'Fleet Card'} · 📅 ${fmtDate(r.date)}${r.note?' · '+r.note:''}${r.savedAt?' · ⏱ '+fmtTime(r.savedAt):''}</div>
         </div>
         <div><div class="e-amt credit">${fmtAmt(r.amount)}</div><div class="e-meta">Credit</div></div>
       </div>
