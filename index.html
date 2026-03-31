@@ -137,7 +137,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div class="brand-sub">BPCL Transaction Tracker</div>
       </div>
     </div>
-    <div class="sync-pill"><div class="sync-dot" id="sdot"></div><span id="stxt">Loading</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+      <div class="sync-pill"><div class="sync-dot" id="sdot"></div><span id="stxt">Loading</span></div>
+      <select id="fy-select" onchange="onFYChange()" style="background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;-webkit-appearance:none;appearance:none;outline:none;"></select>
+    </div>
   </div>
   <div class="tabs">
     <div class="tab active" onclick="switchTab('dsm')">📥 DSM</div>
@@ -152,7 +155,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 <div class="page active" id="page-dsm">
   <div class="card">
     <div class="card-title">📲 New Debit Entry</div>
-    <div class="form-row"><label>Select TID</label><select id="dsm-tid"></select></div>
+    <div class="form-row"><label>Select TID</label><select id="dsm-tid" onchange="autoFillBatch()"></select></div>
     <div class="form-row"><label>Customer / Particulars</label><select id="dsm-cust"></select></div>
     <div class="form-row-2">
       <div><label>Batch No.</label><input type="number" id="dsm-batch" placeholder="e.g. 62" min="1"></div>
@@ -309,7 +312,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
 <script>
 // ─────────────────────────────────────────────────────────────────────────────
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbwe8793e1Oy7sYqBA83lTHpKk9DfDirYfPhGWNFQPCaK2xxeY0083TFd69RxWmtNH6C4w/exec';
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbzeqSllDSEiM_Mf22uB3GfnYfIGQxQAOr1O_jgb3VaRu7st9iVv2ZUVKh6wecl5ycVQXw/exec';
 const RESET_PIN = '1234';
 
 // db: { tids:[], customers:[], transactions:[], received:[], openingBalance:0 }
@@ -320,6 +323,39 @@ let db = { tids:[], customers:[], transactions:[], received:[], openingBalance:0
 
 // ── UTILS ──────────────────────────────────────────────────────────────────
 function todayStr(){return new Date().toISOString().split('T')[0];}
+
+// ── FINANCIAL YEAR HELPERS ─────────────────────────────────────────────────
+function getFYList(){
+  // FY runs April to March. Generate last 3 years + current
+  const now=new Date();
+  const curYear=now.getMonth()>=3?now.getFullYear():now.getFullYear()-1;
+  const fys=[];
+  for(let y=curYear;y>=curYear-2;y--){
+    fys.push({label:`FY ${y}-${String(y+1).slice(-2)}`,start:`${y}-04-01`,end:`${y+1}-03-31`});
+  }
+  return fys;
+}
+function getCurrentFY(){
+  const now=new Date();
+  const y=now.getMonth()>=3?now.getFullYear():now.getFullYear()-1;
+  return{label:`FY ${y}-${String(y+1).slice(-2)}`,start:`${y}-04-01`,end:`${y+1}-03-31`};
+}
+let activeFY=getCurrentFY();
+
+function populateFY(){
+  const sel=document.getElementById('fy-select');
+  const fys=getFYList();
+  sel.innerHTML=fys.map(f=>`<option value="${f.start}|${f.end}"${f.label===activeFY.label?' selected':''}>${f.label}</option>`).join('');
+}
+function onFYChange(){
+  const val=document.getElementById('fy-select').value;
+  const[start,end]=val.split('|');
+  const fys=getFYList();
+  activeFY=fys.find(f=>f.start===start)||getCurrentFY();
+  refreshDSM();refreshRecv();
+  toast(`Switched to ${activeFY.label}`);
+}
+function inFY(date){return date>=activeFY.start&&date<=activeFY.end;}
 function firstOfMonth(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;}
 function fmtAmt(n){return'₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtTime(ts){
@@ -410,7 +446,7 @@ async function loadFromSheet(){
   }
 }
 function saveLocal(){localStorage.setItem('fleet2_db',JSON.stringify(db));}
-function renderAll(){renderTIDs();renderCustomers();populateDropdowns();refreshDSM();refreshRecv();document.getElementById('ob-input').value=db.openingBalance||'';}
+function renderAll(){renderTIDs();renderCustomers();populateDropdowns();populateFY();refreshDSM();refreshRecv();document.getElementById('ob-input').value=db.openingBalance||'';}
 
 // ── TABS ───────────────────────────────────────────────────────────────────
 function switchTab(tab){
@@ -503,6 +539,19 @@ async function saveOpeningBalance(){
 // ── DSM ENTRY ──────────────────────────────────────────────────────────────
 document.getElementById('dsm-date').value=todayStr();
 
+function autoFillBatch(){
+  const tid=document.getElementById('dsm-tid').value.trim();
+  if(!tid)return;
+  // Find last batch for this specific TID
+  const tidTxns=db.transactions.filter(t=>t.tid===tid);
+  if(tidTxns.length>0){
+    const last=[...tidTxns].sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
+    document.getElementById('dsm-batch').value=parseInt(last.batch)+1;
+  } else {
+    document.getElementById('dsm-batch').value='';
+  }
+}
+
 async function saveDSM(){
   const tid=document.getElementById('dsm-tid').value.trim();
   const customer=document.getElementById('dsm-cust').value||'Fleet Card';
@@ -517,6 +566,8 @@ async function saveDSM(){
   db.transactions.push(entry);
   document.getElementById('dsm-amount').value='';
   toast(`Saved ✓  ${customer}  Batch #${batch}  ${fmtAmt(amount)}`);
+  // Auto-fill next batch for same TID
+  document.getElementById('dsm-batch').value=parseInt(batch)+1;
   refreshDSM();saveLocal();
   setSyncStatus('syncing');await apiPost({action:'saveTransaction',data:entry});setSyncStatus('ok');
 }
@@ -524,7 +575,7 @@ async function saveDSM(){
 function refreshDSM(){
   const today=todayStr();
   const todayT=db.transactions.filter(t=>t.date===today).reverse();
-  const recentT=db.transactions.filter(t=>t.date!==today).reverse().slice(0,40);
+  const recentT=db.transactions.filter(t=>t.date!==today&&inFY(t.date)).reverse().slice(0,40);
   document.getElementById('today-count').textContent=`${todayT.length} entr${todayT.length!==1?'ies':'y'}`;
   document.getElementById('dsm-today').innerHTML=todayT.length?todayT.map(t=>txnHTML(t,true)).join(''):'<div class="empty"><div class="ico">📋</div><p>No entries today</p></div>';
   const rl=document.getElementById('dsm-recent');
@@ -613,12 +664,18 @@ function refreshRecv(){
   const totalDr=db.transactions.reduce((s,t)=>s+t.amount,0);
   const totalCr=db.received.reduce((s,r)=>s+r.amount,0);
   const bal=db.openingBalance+totalCr-totalDr;
-  document.getElementById('ov-dr').textContent=fmtAmt(totalDr);
-  document.getElementById('ov-cr').textContent=fmtAmt(totalCr);
-  document.getElementById('ov-bal').textContent=fmtAmt(bal);
+  // Filter totals by FY
+  const fyTxns=db.transactions.filter(t=>inFY(t.date));
+  const fyRecv=db.received.filter(r=>inFY(r.date));
+  const fyDr=fyTxns.reduce((s,t)=>s+t.amount,0);
+  const fyCr=fyRecv.reduce((s,r)=>s+r.amount,0);
+  const fyBal=db.openingBalance+fyCr-fyDr;
+  document.getElementById('ov-dr').textContent=fmtAmt(fyDr);
+  document.getElementById('ov-cr').textContent=fmtAmt(fyCr);
+  document.getElementById('ov-bal').textContent=fmtAmt(fyBal);
   document.getElementById('ov-ob').textContent=fmtAmt(db.openingBalance);
 
-  const sorted=[...db.received].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
+  const sorted=[...db.received].filter(r=>inFY(r.date)).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
   document.getElementById('recv-count').textContent=`${db.received.length} entr${db.received.length!==1?'ies':'y'}`;
   document.getElementById('recv-list').innerHTML=sorted.length?sorted.map(r=>`
     <div class="entry-item">
@@ -678,8 +735,9 @@ function setFilter(f,el){curFilter=f;document.querySelectorAll('#rep-chips .chip
 
 function getFilteredEntries(){
   const today=todayStr(),now=new Date();
-  let txns=[...db.transactions];
-  let recv=[...db.received];
+  // Always filter by active FY first
+  let txns=db.transactions.filter(t=>inFY(t.date));
+  let recv=db.received.filter(r=>inFY(r.date));
   const filterDate=(arr,dateField)=>{
     if(curFilter==='today')return arr.filter(x=>x[dateField]===today);
     if(curFilter==='week'){const w=new Date(now);w.setDate(w.getDate()-7);return arr.filter(x=>new Date(x[dateField])>=w);}
