@@ -163,10 +163,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   </div>
   <div class="card">
     <div class="card-title">📲 New Debit Entry</div>
-    <div class="form-row"><label>Select TID</label><select id="dsm-tid"></select></div>
+    <div class="form-row"><label>Select TID *</label><select id="dsm-tid" onchange="onDsmTIDChange()"><option value="">— Choose TID —</option></select></div>
     <div class="form-row"><label>Customer / Particulars</label><select id="dsm-cust"></select></div>
     <div class="form-row-2">
-      <div><label>Batch No.</label><input type="number" id="dsm-batch" placeholder="e.g. 62" min="1"></div>
+      <div><label>Batch No. <span style="font-size:10px;color:var(--green);font-weight:600;">(auto-filled)</span></label><input type="number" id="dsm-batch" placeholder="Auto from TID" min="1" style="background:#F0F9FF;border-color:#BAE6FD;"></div>
       <div><label>Date</label><input type="date" id="dsm-date"></div>
     </div>
     <div class="form-row">
@@ -643,13 +643,26 @@ async function saveOpeningBalance(){
 // ── DSM ENTRY ──────────────────────────────────────────────────────────────
 document.getElementById('dsm-date').value=todayStr();
 
+// Auto-fill batch from latest transaction for selected TID
+function onDsmTIDChange(){
+  const tid=document.getElementById('dsm-tid').value;
+  if(!tid)return;
+  const tidTxns=fyTxns().filter(t=>t.tid===tid);
+  if(tidTxns.length){
+    const latest=tidTxns.reduce((a,b)=>a.date>b.date||(a.date===b.date&&a.createdAt>b.createdAt)?a:b);
+    document.getElementById('dsm-batch').value=latest.batch;
+  } else {
+    document.getElementById('dsm-batch').value='';
+  }
+}
+
 async function saveDSM(){
   const tid=document.getElementById('dsm-tid').value.trim();
   const customer=document.getElementById('dsm-cust').value||'Fleet Card';
   const batch=document.getElementById('dsm-batch').value.trim();
   const date=document.getElementById('dsm-date').value;
   const amount=parseFloat(document.getElementById('dsm-amount').value);
-  if(!tid)return toast('Select a TID','err');
+  if(!tid)return toast('Select a TID — required','err');
   if(!batch)return toast('Enter batch number','err');
   if(!date)return toast('Select a date','err');
   if(!amount||amount<=0)return toast('Enter a valid amount','err');
@@ -661,6 +674,8 @@ async function saveDSM(){
   const entryFY=dateToFY(date);
   if(entryFY&&!db.activeFYs.includes(entryFY)){db.activeFYs=[...db.activeFYs,entryFY].sort();}
   document.getElementById('dsm-amount').value='';
+  document.getElementById('dsm-tid').value='';
+  document.getElementById('dsm-batch').value='';
   toast(`Saved ✓  ${customer}  Batch #${batch}  ${fmtAmt(amount)}`);
   refreshDSM();saveLocal();
   setSyncStatus('syncing');await apiPost({action:'saveTransaction',data:entry});setSyncStatus('ok');
