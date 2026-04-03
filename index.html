@@ -137,10 +137,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div class="brand-sub">BPCL Transaction Tracker</div>
       </div>
     </div>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-      <div class="sync-pill"><div class="sync-dot" id="sdot"></div><span id="stxt">Loading</span></div>
-      <select id="fy-select" onchange="onFYChange()" style="background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;-webkit-appearance:none;appearance:none;outline:none;"></select>
-    </div>
+    <div class="sync-pill"><div class="sync-dot" id="sdot"></div><span id="stxt">Loading</span></div>
   </div>
   <div class="tabs">
     <div class="tab active" onclick="switchTab('dsm')">📥 DSM</div>
@@ -155,7 +152,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 <div class="page active" id="page-dsm">
   <div class="card">
     <div class="card-title">📲 New Debit Entry</div>
-    <div class="form-row"><label>Select TID</label><select id="dsm-tid" onchange="autoFillBatch()"></select></div>
+    <div class="form-row"><label>Select TID</label><select id="dsm-tid"></select></div>
     <div class="form-row"><label>Customer / Particulars</label><select id="dsm-cust"></select></div>
     <div class="form-row-2">
       <div><label>Batch No.</label><input type="number" id="dsm-batch" placeholder="e.g. 62" min="1"></div>
@@ -179,14 +176,15 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <div class="tiles">
     <div class="tile t-r"><div class="tile-val" id="ov-dr">₹0</div><div class="tile-lbl">Total Debit</div></div>
     <div class="tile t-g"><div class="tile-val" id="ov-cr">₹0</div><div class="tile-lbl">Total Credit</div></div>
-    <div class="tile t-o"><div class="tile-val" id="ov-bal">₹0</div><div class="tile-lbl">Balance</div></div>
-    <div class="tile t-b"><div class="tile-val" id="ov-ob">₹0</div><div class="tile-lbl">Opening Bal</div></div>
+    <div class="tile t-o"><div class="tile-val" id="ov-bal">₹0</div><div class="tile-lbl">FC Balance</div></div>
+    <div class="tile t-b"><div class="tile-val" id="ov-ob">₹0</div><div class="tile-lbl">FC Opening Bal</div></div>
   </div>
   <div class="card">
     <div class="card-title">💳 Enter Credit Received</div>
+    <div class="form-row"><label>Select TID *</label><select id="recv-tid" onchange="onRecvTIDChange()"><option value="">— Choose TID —</option></select></div>
     <div class="form-row"><label>Customer / Particulars</label><select id="recv-cust"></select></div>
     <div class="form-row-2">
-      <div><label>Batch No.</label><input type="number" id="recv-batch" placeholder="e.g. 3132" min="1"></div>
+      <div><label>Batch No. <span style="font-size:10px;color:var(--green);font-weight:600;">(auto-filled)</span></label><input type="number" id="recv-batch" placeholder="Auto from TID" min="1" style="background:#F0F9FF;border-color:#BAE6FD;"></div>
       <div><label>Date</label><input type="date" id="recv-date"></div>
     </div>
     <div class="form-row">
@@ -219,7 +217,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
     <div class="form-row-2">
       <div><label>TID</label><select id="rep-tid" onchange="refreshReport()"><option value="ALL">All TIDs</option></select></div>
-      <div><label>Particulars</label><select id="rep-cust" onchange="refreshReport()"><option value="ALL">All</option><option value="Fleet Card">Fleet Card</option></select></div>
+      <div><label>Particulars</label><select id="rep-cust" onchange="refreshReport()"><option value="ALL">All</option><option value="Fleet Card">Fleet Card</option><option value="ALL_CUSTOMERS">All Customers (Combined)</option></select></div>
     </div>
   </div>
   <div class="tiles">
@@ -246,7 +244,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
     <div class="form-row-2">
       <div><label>TID</label><select id="led-tid"><option value="ALL">All TIDs</option></select></div>
-      <div><label>Particulars</label><select id="led-cust"><option value="ALL">All (Combined)</option><option value="Fleet Card">Fleet Card Only</option></select></div>
+      <div><label>Particulars</label><select id="led-cust"><option value="ALL">All (Fleet Card + Customers)</option><option value="Fleet Card">Fleet Card Only</option><option value="ALL_CUSTOMERS">All Customers (Combined)</option></select></div>
     </div>
     <button class="btn btn-primary" onclick="generateLedger()">📒 Generate Ledger</button>
   </div>
@@ -312,7 +310,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
 <script>
 // ─────────────────────────────────────────────────────────────────────────────
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbzeqSllDSEiM_Mf22uB3GfnYfIGQxQAOr1O_jgb3VaRu7st9iVv2ZUVKh6wecl5ycVQXw/exec';
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbwe8793e1Oy7sYqBA83lTHpKk9DfDirYfPhGWNFQPCaK2xxeY0083TFd69RxWmtNH6C4w/exec';
 const RESET_PIN = '1234';
 
 // db: { tids:[], customers:[], transactions:[], received:[], openingBalance:0 }
@@ -323,49 +321,8 @@ let db = { tids:[], customers:[], transactions:[], received:[], openingBalance:0
 
 // ── UTILS ──────────────────────────────────────────────────────────────────
 function todayStr(){return new Date().toISOString().split('T')[0];}
-
-// ── FINANCIAL YEAR HELPERS ─────────────────────────────────────────────────
-function getFYList(){
-  // FY runs April to March. Generate last 3 years + current
-  const now=new Date();
-  const curYear=now.getMonth()>=3?now.getFullYear():now.getFullYear()-1;
-  const fys=[];
-  for(let y=curYear;y>=curYear-2;y--){
-    fys.push({label:`FY ${y}-${String(y+1).slice(-2)}`,start:`${y}-04-01`,end:`${y+1}-03-31`});
-  }
-  return fys;
-}
-function getCurrentFY(){
-  const now=new Date();
-  const y=now.getMonth()>=3?now.getFullYear():now.getFullYear()-1;
-  return{label:`FY ${y}-${String(y+1).slice(-2)}`,start:`${y}-04-01`,end:`${y+1}-03-31`};
-}
-let activeFY=getCurrentFY();
-
-function populateFY(){
-  const sel=document.getElementById('fy-select');
-  const fys=getFYList();
-  sel.innerHTML=fys.map(f=>`<option value="${f.start}|${f.end}"${f.label===activeFY.label?' selected':''}>${f.label}</option>`).join('');
-}
-function onFYChange(){
-  const val=document.getElementById('fy-select').value;
-  const[start,end]=val.split('|');
-  const fys=getFYList();
-  activeFY=fys.find(f=>f.start===start)||getCurrentFY();
-  refreshDSM();refreshRecv();
-  toast(`Switched to ${activeFY.label}`);
-}
-function inFY(date){return date>=activeFY.start&&date<=activeFY.end;}
 function firstOfMonth(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;}
 function fmtAmt(n){return'₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function fmtTime(ts){
-  if(!ts)return'';
-  try{
-    const d=new Date(ts);
-    if(isNaN(d.getTime()))return'';
-    return d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
-  }catch{return'';}
-}
 function fmtDate(d){
   if(!d)return'—';const s=String(d);
   if(s.includes('/'))return s;
@@ -446,7 +403,7 @@ async function loadFromSheet(){
   }
 }
 function saveLocal(){localStorage.setItem('fleet2_db',JSON.stringify(db));}
-function renderAll(){renderTIDs();renderCustomers();populateDropdowns();populateFY();refreshDSM();refreshRecv();document.getElementById('ob-input').value=db.openingBalance||'';}
+function renderAll(){renderTIDs();renderCustomers();populateDropdowns();refreshDSM();refreshRecv();document.getElementById('ob-input').value=db.openingBalance||'';}
 
 // ── TABS ───────────────────────────────────────────────────────────────────
 function switchTab(tab){
@@ -465,10 +422,10 @@ function switchTab(tab){
 // ── DROPDOWNS ─────────────────────────────────────────────────────────────
 function populateDropdowns(){
   // TID dropdowns
-  ['dsm-tid','rep-tid','led-tid'].forEach(id=>{
+  ['dsm-tid','recv-tid','rep-tid','led-tid'].forEach(id=>{
     const sel=document.getElementById(id);if(!sel)return;
     const cur=sel.value||'ALL';
-    const opts=id==='dsm-tid'?'<option value="">— Choose TID —</option>':'<option value="ALL">All TIDs</option>';
+    const opts=(id==='dsm-tid'||id==='recv-tid')?'<option value="">— Choose TID —</option>':'<option value="ALL">All TIDs</option>';
     sel.innerHTML=opts+(db.tids||[]).map(t=>`<option${t===cur?' selected':''}>${t}</option>`).join('');
   });
   // Customer dropdowns
@@ -480,10 +437,24 @@ function populateDropdowns(){
   });
   // Report customer filter
   const rc=document.getElementById('rep-cust');
-  if(rc){const cur=rc.value||'ALL';rc.innerHTML='<option value="ALL">All</option>'+'<option value="Fleet Card">Fleet Card</option>'+(db.customers||[]).map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');}
+  if(rc){
+    const cur=rc.value||'ALL';
+    rc.innerHTML='<option value="ALL">All (Everything)</option>'
+      +'<option value="Fleet Card">Fleet Card</option>'
+      +'<option value="ALL_CUSTOMERS">All Customers (Combined)</option>'
+      +(db.customers||[]).map(c=>`<option value="${c}"${c===cur?' selected':''}>${c}</option>`).join('');
+    if(cur&&rc.querySelector(`option[value="${cur}"]`))rc.value=cur;
+  }
   // Ledger customer filter
   const lc=document.getElementById('led-cust');
-  if(lc){const cur=lc.value||'ALL';lc.innerHTML='<option value="ALL">All (Combined)</option><option value="Fleet Card">Fleet Card Only</option>'+(db.customers||[]).map(c=>`<option value="${c}"${c===cur?' selected':''}>${c} Only</option>`).join('');}
+  if(lc){
+    const cur=lc.value||'ALL';
+    lc.innerHTML='<option value="ALL">All (Fleet Card + Customers)</option>'
+      +'<option value="Fleet Card">Fleet Card Only</option>'
+      +'<option value="ALL_CUSTOMERS">All Customers (Combined)</option>'
+      +(db.customers||[]).map(c=>`<option value="${c}"${c===cur?' selected':''}>${c} Only</option>`).join('');
+    if(cur&&lc.querySelector(`option[value="${cur}"]`))lc.value=cur;
+  }
 }
 function populateLedgerFilters(){populateDropdowns();}
 
@@ -539,19 +510,6 @@ async function saveOpeningBalance(){
 // ── DSM ENTRY ──────────────────────────────────────────────────────────────
 document.getElementById('dsm-date').value=todayStr();
 
-function autoFillBatch(){
-  const tid=document.getElementById('dsm-tid').value.trim();
-  if(!tid)return;
-  // Find last batch for this specific TID
-  const tidTxns=db.transactions.filter(t=>t.tid===tid);
-  if(tidTxns.length>0){
-    const last=[...tidTxns].sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
-    document.getElementById('dsm-batch').value=parseInt(last.batch)+1;
-  } else {
-    document.getElementById('dsm-batch').value='';
-  }
-}
-
 async function saveDSM(){
   const tid=document.getElementById('dsm-tid').value.trim();
   const customer=document.getElementById('dsm-cust').value||'Fleet Card';
@@ -566,8 +524,6 @@ async function saveDSM(){
   db.transactions.push(entry);
   document.getElementById('dsm-amount').value='';
   toast(`Saved ✓  ${customer}  Batch #${batch}  ${fmtAmt(amount)}`);
-  // Auto-fill next batch for same TID
-  document.getElementById('dsm-batch').value=parseInt(batch)+1;
   refreshDSM();saveLocal();
   setSyncStatus('syncing');await apiPost({action:'saveTransaction',data:entry});setSyncStatus('ok');
 }
@@ -575,7 +531,7 @@ async function saveDSM(){
 function refreshDSM(){
   const today=todayStr();
   const todayT=db.transactions.filter(t=>t.date===today).reverse();
-  const recentT=db.transactions.filter(t=>t.date!==today&&inFY(t.date)).reverse().slice(0,40);
+  const recentT=db.transactions.filter(t=>t.date!==today).reverse().slice(0,40);
   document.getElementById('today-count').textContent=`${todayT.length} entr${todayT.length!==1?'ies':'y'}`;
   document.getElementById('dsm-today').innerHTML=todayT.length?todayT.map(t=>txnHTML(t,true)).join(''):'<div class="empty"><div class="ico">📋</div><p>No entries today</p></div>';
   const rl=document.getElementById('dsm-recent');
@@ -590,7 +546,7 @@ function txnHTML(t,showDel){
     <div class="entry-top">
       <div>
         <div class="e-main">${t.tid} · Batch #${t.batch}</div>
-        <div class="e-sub">👤 ${t.customer||'Fleet Card'} · 📅 ${fmtDate(t.date)}${t.createdAt?' · ⏱ '+fmtTime(t.createdAt):''}</div>
+        <div class="e-sub">👤 ${t.customer||'Fleet Card'} · 📅 ${fmtDate(t.date)}</div>
       </div>
       <div><div class="e-amt debit">${fmtAmt(t.amount)}</div><div class="e-meta">Debit</div></div>
     </div>
@@ -641,48 +597,64 @@ async function delTxn(id){
 // ── RECEIVED ───────────────────────────────────────────────────────────────
 document.getElementById('recv-date').value=todayStr();
 
+// Auto-fill batch from latest transaction for selected TID
+function onRecvTIDChange(){
+  const tid=document.getElementById('recv-tid').value;
+  if(!tid)return;
+  // Find the latest transaction with this TID and use its batch as default
+  const tidTxns=db.transactions.filter(t=>t.tid===tid);
+  if(tidTxns.length){
+    const latest=tidTxns.reduce((a,b)=>a.date>b.date||(a.date===b.date&&a.createdAt>b.createdAt)?a:b);
+    document.getElementById('recv-batch').value=latest.batch;
+  } else {
+    document.getElementById('recv-batch').value='';
+  }
+}
+
 async function saveRecv(){
+  const tid=document.getElementById('recv-tid').value.trim();
   const customer=document.getElementById('recv-cust').value||'Fleet Card';
   const batch=document.getElementById('recv-batch').value.trim();
   const date=document.getElementById('recv-date').value;
   const amount=parseFloat(document.getElementById('recv-amount').value);
   const note=document.getElementById('recv-note').value.trim();
-  if(!batch)return toast('Enter batch number','err');
+  if(!tid)return toast('Select a TID — required','err');
+  if(!batch)return toast('Batch number required','err');
   if(!date)return toast('Select a date','err');
   if(!amount||amount<=0)return toast('Enter a valid amount','err');
-  const entry={id:uid(),customer,batch,date,amount,note,savedAt:new Date().toISOString()};
+  const entry={id:uid(),tid,customer,batch,date,amount,note,savedAt:new Date().toISOString()};
   db.received.push(entry);
   document.getElementById('recv-amount').value='';
   document.getElementById('recv-batch').value='';
   document.getElementById('recv-note').value='';
+  document.getElementById('recv-tid').value='';
   toast(`Saved ✓  ${customer}  ${fmtAmt(amount)}`);
   refreshRecv();saveLocal();
   setSyncStatus('syncing');await apiPost({action:'saveReceived',data:entry});setSyncStatus('ok');
 }
 
 function refreshRecv(){
+  // Fleet Card only for opening balance calc
+  const fcTxns=db.transactions.filter(t=>t.customer==='Fleet Card'||!t.customer);
+  const fcRecv=db.received.filter(r=>r.customer==='Fleet Card'||!r.customer);
   const totalDr=db.transactions.reduce((s,t)=>s+t.amount,0);
   const totalCr=db.received.reduce((s,r)=>s+r.amount,0);
-  const bal=db.openingBalance+totalCr-totalDr;
-  // Filter totals by FY
-  const fyTxns=db.transactions.filter(t=>inFY(t.date));
-  const fyRecv=db.received.filter(r=>inFY(r.date));
-  const fyDr=fyTxns.reduce((s,t)=>s+t.amount,0);
-  const fyCr=fyRecv.reduce((s,r)=>s+r.amount,0);
-  const fyBal=db.openingBalance+fyCr-fyDr;
-  document.getElementById('ov-dr').textContent=fmtAmt(fyDr);
-  document.getElementById('ov-cr').textContent=fmtAmt(fyCr);
-  document.getElementById('ov-bal').textContent=fmtAmt(fyBal);
+  const fcDr=fcTxns.reduce((s,t)=>s+t.amount,0);
+  const fcCr=fcRecv.reduce((s,r)=>s+r.amount,0);
+  const bal=db.openingBalance+fcCr-fcDr;
+  document.getElementById('ov-dr').textContent=fmtAmt(totalDr);
+  document.getElementById('ov-cr').textContent=fmtAmt(totalCr);
+  document.getElementById('ov-bal').textContent=fmtAmt(bal);
   document.getElementById('ov-ob').textContent=fmtAmt(db.openingBalance);
 
-  const sorted=[...db.received].filter(r=>inFY(r.date)).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
+  const sorted=[...db.received].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
   document.getElementById('recv-count').textContent=`${db.received.length} entr${db.received.length!==1?'ies':'y'}`;
   document.getElementById('recv-list').innerHTML=sorted.length?sorted.map(r=>`
     <div class="entry-item">
       <div class="entry-top">
         <div>
-          <div class="e-main">Batch #${r.batch}</div>
-          <div class="e-sub">👤 ${r.customer||'Fleet Card'} · 📅 ${fmtDate(r.date)}${r.note?' · '+r.note:''}${r.savedAt?' · ⏱ '+fmtTime(r.savedAt):''}</div>
+          <div class="e-main">${r.tid?r.tid+' · ':''}Batch #${r.batch}</div>
+          <div class="e-sub">👤 ${r.customer||'Fleet Card'} · 📅 ${fmtDate(r.date)}${r.note?' · '+r.note:''}</div>
         </div>
         <div><div class="e-amt credit">${fmtAmt(r.amount)}</div><div class="e-meta">Credit</div></div>
       </div>
@@ -695,9 +667,11 @@ function refreshRecv(){
 
 function editRecv(id){
   const r=db.received.find(x=>x.id===id);if(!r)return;
+  const tOpts=(db.tids||[]).map(x=>`<option${x===r.tid?' selected':''}>${x}</option>`).join('');
   const custs=['Fleet Card',...(db.customers||[])];
   const cOpts=custs.map(c=>`<option${c===r.customer?' selected':''}>${c}</option>`).join('');
   showModal(`<div style="font-size:16px;font-weight:700;margin-bottom:14px;">✏️ Edit Credit Entry</div>
+    <div class="form-row"><label>TID</label><select id="er-tid">${tOpts}</select></div>
     <div class="form-row"><label>Customer</label><select id="er-cust">${cOpts}</select></div>
     <div class="form-row-2">
       <div><label>Batch No.</label><input type="number" id="er-batch" value="${r.batch}" min="1"></div>
@@ -711,14 +685,16 @@ function editRecv(id){
     </div>`);
 }
 async function saveEditRecv(id){
+  const tid=document.getElementById('er-tid').value;
   const customer=document.getElementById('er-cust').value;
   const batch=document.getElementById('er-batch').value.trim();
   const date=document.getElementById('er-date').value;
   const amount=parseFloat(document.getElementById('er-amount').value);
   const note=document.getElementById('er-note').value.trim();
+  if(!tid)return toast('Select a TID','err');
   if(!batch||!date||!amount||amount<=0)return toast('Fill all fields','err');
   const i=db.received.findIndex(r=>r.id===id);
-  if(i>=0)db.received[i]={...db.received[i],customer,batch,date,amount,note};
+  if(i>=0)db.received[i]={...db.received[i],tid,customer,batch,date,amount,note};
   closeModal();refreshRecv();saveLocal();toast('Updated ✓');
   setSyncStatus('syncing');await apiPost({action:'updateReceived',data:db.received[i>=0?i:0]});setSyncStatus('ok');
 }
@@ -735,9 +711,8 @@ function setFilter(f,el){curFilter=f;document.querySelectorAll('#rep-chips .chip
 
 function getFilteredEntries(){
   const today=todayStr(),now=new Date();
-  // Always filter by active FY first
-  let txns=db.transactions.filter(t=>inFY(t.date));
-  let recv=db.received.filter(r=>inFY(r.date));
+  let txns=[...db.transactions];
+  let recv=[...db.received];
   const filterDate=(arr,dateField)=>{
     if(curFilter==='today')return arr.filter(x=>x[dateField]===today);
     if(curFilter==='week'){const w=new Date(now);w.setDate(w.getDate()-7);return arr.filter(x=>new Date(x[dateField])>=w);}
@@ -752,7 +727,16 @@ function getFilteredEntries(){
   const tid=document.getElementById('rep-tid').value;
   if(tid!=='ALL')txns=txns.filter(t=>t.tid===tid);
   const cust=document.getElementById('rep-cust').value;
-  if(cust!=='ALL'){txns=txns.filter(t=>t.customer===cust);recv=recv.filter(r=>r.customer===cust);}
+  if(cust==='Fleet Card'){
+    txns=txns.filter(t=>t.customer==='Fleet Card'||!t.customer);
+    recv=recv.filter(r=>r.customer==='Fleet Card'||!r.customer);
+  } else if(cust==='ALL_CUSTOMERS'){
+    txns=txns.filter(t=>t.customer&&t.customer!=='Fleet Card');
+    recv=recv.filter(r=>r.customer&&r.customer!=='Fleet Card');
+  } else if(cust!=='ALL'){
+    txns=txns.filter(t=>t.customer===cust);
+    recv=recv.filter(r=>r.customer===cust);
+  }
   return{txns,recv};
 }
 
@@ -761,7 +745,10 @@ function refreshReport(){
   const {txns,recv}=getFilteredEntries();
   const totalDr=txns.reduce((s,t)=>s+t.amount,0);
   const totalCr=recv.reduce((s,r)=>s+r.amount,0);
-  const bal=totalCr-totalDr;
+  const cust=document.getElementById('rep-cust').value;
+  const isFleetCard=(cust==='Fleet Card');
+  const ob=isFleetCard?db.openingBalance:0;
+  const bal=ob+totalCr-totalDr;
   document.getElementById('rt-dr').textContent=fmtAmt(totalDr);
   document.getElementById('rt-cr').textContent=fmtAmt(totalCr);
   document.getElementById('rt-bal').textContent=fmtAmt(bal);
@@ -802,21 +789,37 @@ function generateLedger(){
   let txns=db.transactions.filter(t=>t.date>=from&&t.date<=to);
   let recv=db.received.filter(r=>r.date>=from&&r.date<=to);
   if(tid!=='ALL')txns=txns.filter(t=>t.tid===tid);
-  if(cust!=='ALL'){txns=txns.filter(t=>t.customer===cust);recv=recv.filter(r=>r.customer===cust);}
+
+  // Filter by particulars selection
+  if(cust==='Fleet Card'){
+    txns=txns.filter(t=>t.customer==='Fleet Card'||!t.customer);
+    recv=recv.filter(r=>r.customer==='Fleet Card'||!r.customer);
+  } else if(cust==='ALL_CUSTOMERS'){
+    txns=txns.filter(t=>t.customer&&t.customer!=='Fleet Card');
+    recv=recv.filter(r=>r.customer&&r.customer!=='Fleet Card');
+  } else if(cust!=='ALL'){
+    txns=txns.filter(t=>t.customer===cust);
+    recv=recv.filter(r=>r.customer===cust);
+  }
+
+  // Opening balance only applies to Fleet Card
+  const isFleetCardView=(cust==='Fleet Card');
+  const ob=isFleetCardView?db.openingBalance:0;
 
   const combined=[
     ...txns.map(t=>({...t,type:'debit'})),
     ...recv.map(r=>({...r,type:'credit'}))
   ].sort((a,b)=>a.date.localeCompare(b.date)||(a.createdAt||a.savedAt||'').localeCompare(b.createdAt||b.savedAt||''));
 
-  const ob=db.openingBalance;
   let bal=ob;
   const totalDr=txns.reduce((s,t)=>s+t.amount,0);
   const totalCr=recv.reduce((s,r)=>s+r.amount,0);
   const closingBal=ob+totalCr-totalDr;
 
   // Update banner
-  document.getElementById('led-ob').textContent=fmtAmt(ob);
+  const obLabel=document.querySelector('#ledger-output .bal-item:first-child .bal-lbl');
+  if(obLabel)obLabel.textContent=isFleetCardView?'Opening Balance':'Opening Bal (N/A)';
+  document.getElementById('led-ob').textContent=isFleetCardView?fmtAmt(ob):'—';
   const cbEl=document.getElementById('led-cb');
   cbEl.textContent=fmtAmt(Math.abs(closingBal))+(closingBal<0?' (Dr)':closingBal>0?' (Cr)':'');
   cbEl.className='bal-val '+(closingBal<0?'neg':closingBal>0?'pos':'zero');
@@ -825,12 +828,15 @@ function generateLedger(){
   netEl.textContent=fmtAmt(Math.abs(net))+(net<0?' Dr':net>0?' Cr':'');
   netEl.className='bal-val '+(net<0?'neg':net>0?'pos':'zero');
 
-  let rows=`<div class="ledger-row opening">
-    <span class="lr-date"></span>
-    <span class="lr-particulars" style="grid-column:1/4;font-weight:700;color:var(--navy);">OPENING BALANCE</span>
-    <span></span>
-    <span class="lr-balance" style="color:var(--blue);">${fmtAmt(ob)}</span>
-  </div>`;
+  let rows='';
+  if(isFleetCardView){
+    rows=`<div class="ledger-row opening">
+      <span class="lr-date"></span>
+      <span class="lr-particulars" style="grid-column:1/4;font-weight:700;color:var(--navy);">OPENING BALANCE</span>
+      <span></span>
+      <span class="lr-balance" style="color:var(--blue);">${fmtAmt(ob)}</span>
+    </div>`;
+  }
 
   combined.forEach(e=>{
     const isD=e.type==='debit';
@@ -895,11 +901,14 @@ function exportLedgerExcel(){
   let txns=db.transactions.filter(t=>t.date>=from&&t.date<=to);
   let recv=db.received.filter(r=>r.date>=from&&r.date<=to);
   if(tid!=='ALL')txns=txns.filter(t=>t.tid===tid);
-  if(cust!=='ALL'){txns=txns.filter(t=>t.customer===cust);recv=recv.filter(r=>r.customer===cust);}
+  const isFC=(cust==='Fleet Card');
+  if(cust==='Fleet Card'){txns=txns.filter(t=>t.customer==='Fleet Card'||!t.customer);recv=recv.filter(r=>r.customer==='Fleet Card'||!r.customer);}
+  else if(cust==='ALL_CUSTOMERS'){txns=txns.filter(t=>t.customer&&t.customer!=='Fleet Card');recv=recv.filter(r=>r.customer&&r.customer!=='Fleet Card');}
+  else if(cust!=='ALL'){txns=txns.filter(t=>t.customer===cust);recv=recv.filter(r=>r.customer===cust);}
   const combined=[...txns.map(t=>({...t,type:'debit'})),...recv.map(r=>({...r,type:'credit'}))].sort((a,b)=>a.date.localeCompare(b.date));
-  const ob=db.openingBalance;let bal=ob;
+  const ob=isFC?db.openingBalance:0;let bal=ob;
   const data=[['Date','TID','Batch #','Particulars','Debit (₹)','Credit (₹)','Balance (₹)']];
-  data.push(['','','','OPENING BALANCE','','',ob]);
+  if(isFC)data.push(['','','','OPENING BALANCE','','',ob]);
   combined.forEach(e=>{
     const isD=e.type==='debit';
     if(isD)bal-=e.amount;else bal+=e.amount;
@@ -921,10 +930,15 @@ function exportPDF(){
   if(!txns.length&&!recv.length)return toast('No data','err');
   const combined=[...txns.map(t=>({...t,type:'debit'})),...recv.map(r=>({...r,type:'credit'}))].sort((a,b)=>a.date.localeCompare(b.date));
   const totalDr=txns.reduce((s,t)=>s+t.amount,0),totalCr=recv.reduce((s,r)=>s+r.amount,0);
+  const custFilter=document.getElementById('rep-cust').value;
+  const isFC=(custFilter==='Fleet Card');
+  const ob=isFC?db.openingBalance:0;
+  const bal=ob+totalCr-totalDr;
   let rows='';combined.forEach(e=>{
     const isD=e.type==='debit';
     rows+=`<tr><td>${fmtDate(e.date)}</td><td>${e.tid||'—'}</td><td>#${e.batch}</td><td>${e.customer||'Fleet Card'}</td><td style="color:#DC2626;font-family:monospace;font-weight:700;">${isD?'₹'+e.amount.toLocaleString('en-IN',{minimumFractionDigits:2}):''}</td><td style="color:#059669;font-family:monospace;font-weight:700;">${!isD?'₹'+e.amount.toLocaleString('en-IN',{minimumFractionDigits:2}):''}</td></tr>`;
   });
+  const particularsLabel=custFilter==='ALL'?'All':custFilter==='ALL_CUSTOMERS'?'All Customers':custFilter;
   const w=window.open('','_blank');
   w.document.write(`<!DOCTYPE html><html><head><title>Fleet Card Report</title>
   <style>body{font-family:Arial,sans-serif;font-size:12px;padding:24px;}h1{font-size:18px;margin-bottom:4px;}
@@ -936,12 +950,13 @@ function exportPDF(){
   tfoot td{background:#164E63!important;color:#fff!important;font-weight:700;}
   .btn{background:#0369A1;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:700;margin-top:18px;}
   @media print{.btn{display:none;}}</style></head><body>
-  <h1>⛽ FLEET CARD TRANSACTION REPORT</h1>
+  <h1>⛽ FLEET CARD TRANSACTION REPORT — ${particularsLabel}</h1>
   <div class="meta">Generated: ${new Date().toLocaleString('en-IN')}</div>
   <div class="summary">
     <div class="sbox"><div class="sval" style="color:#DC2626;">₹${totalDr.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Debit</div></div>
     <div class="sbox"><div class="sval" style="color:#059669;">₹${totalCr.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Credit</div></div>
-    <div class="sbox"><div class="sval" style="color:#0369A1;">₹${Math.abs(totalCr-totalDr).toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Balance</div></div>
+    ${isFC?`<div class="sbox"><div class="sval" style="color:#0369A1;">₹${ob.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Opening Bal</div></div>`:''}
+    <div class="sbox"><div class="sval" style="color:${bal<0?'#DC2626':bal>0?'#059669':'#333'};">₹${Math.abs(bal).toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Balance${bal<0?' (Dr)':bal>0?' (Cr)':''}</div></div>
   </div>
   <table><thead><tr><th>Date</th><th>TID</th><th>Batch #</th><th>Particulars</th><th>Debit</th><th>Credit</th></tr></thead>
   <tbody>${rows}</tbody>
@@ -956,12 +971,17 @@ function exportLedgerPDF(){
   let txns=db.transactions.filter(t=>t.date>=from&&t.date<=to);
   let recv=db.received.filter(r=>r.date>=from&&r.date<=to);
   if(tid!=='ALL')txns=txns.filter(t=>t.tid===tid);
-  if(cust!=='ALL'){txns=txns.filter(t=>t.customer===cust);recv=recv.filter(r=>r.customer===cust);}
+  const isFC=(cust==='Fleet Card');
+  if(cust==='Fleet Card'){txns=txns.filter(t=>t.customer==='Fleet Card'||!t.customer);recv=recv.filter(r=>r.customer==='Fleet Card'||!r.customer);}
+  else if(cust==='ALL_CUSTOMERS'){txns=txns.filter(t=>t.customer&&t.customer!=='Fleet Card');recv=recv.filter(r=>r.customer&&r.customer!=='Fleet Card');}
+  else if(cust!=='ALL'){txns=txns.filter(t=>t.customer===cust);recv=recv.filter(r=>r.customer===cust);}
   const combined=[...txns.map(t=>({...t,type:'debit'})),...recv.map(r=>({...r,type:'credit'}))].sort((a,b)=>a.date.localeCompare(b.date));
-  const ob=db.openingBalance;let bal=ob;
+  const ob=isFC?db.openingBalance:0;let bal=ob;
   const totalDr=txns.reduce((s,t)=>s+t.amount,0),totalCr=recv.reduce((s,r)=>s+r.amount,0);
   const cb=ob+totalCr-totalDr;
-  let rows=`<tr style="background:#EFF6FF;"><td colspan="4" style="font-weight:700;">OPENING BALANCE</td><td></td><td></td><td style="font-family:monospace;font-weight:700;color:#0369A1;">₹${ob.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>`;
+  const particularsLabel=cust==='ALL'?'All':cust==='ALL_CUSTOMERS'?'All Customers':cust;
+  let rows='';
+  if(isFC){rows=`<tr style="background:#EFF6FF;"><td colspan="4" style="font-weight:700;">OPENING BALANCE</td><td></td><td></td><td style="font-family:monospace;font-weight:700;color:#0369A1;">₹${ob.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>`;}
   combined.forEach(e=>{
     const isD=e.type==='debit';
     if(isD)bal-=e.amount;else bal+=e.amount;
@@ -981,10 +1001,10 @@ function exportLedgerPDF(){
   td{padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;}tr:nth-child(even) td{background:#F8FBFD;}
   .btn{background:#0369A1;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:700;margin-top:18px;}
   @media print{.btn{display:none;}}</style></head><body>
-  <h1>⛽ FLEET CARD — TRANSACTION LEDGER</h1>
+  <h1>⛽ FLEET CARD — LEDGER · ${particularsLabel}</h1>
   <div class="meta">Period: ${fmtDate(from)} to ${fmtDate(to)} · Generated: ${new Date().toLocaleString('en-IN')}</div>
   <div class="summary">
-    <div class="sbox"><div class="sval" style="color:#0369A1;">₹${ob.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Opening Balance</div></div>
+    ${isFC?`<div class="sbox"><div class="sval" style="color:#0369A1;">₹${ob.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Opening Balance</div></div>`:''}
     <div class="sbox"><div class="sval" style="color:#DC2626;">₹${totalDr.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Debit</div></div>
     <div class="sbox"><div class="sval" style="color:#059669;">₹${totalCr.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Credit</div></div>
     <div class="sbox"><div class="sval" style="color:${cb<0?'#DC2626':cb>0?'#059669':'#333'};">₹${Math.abs(cb).toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Closing Balance</div></div>
