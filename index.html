@@ -643,14 +643,14 @@ async function saveOpeningBalance(){
 // ── DSM ENTRY ──────────────────────────────────────────────────────────────
 document.getElementById('dsm-date').value=todayStr();
 
-// Auto-fill batch from latest transaction for selected TID
+// Auto-fill batch +1 from latest transaction for selected TID
 function onDsmTIDChange(){
   const tid=document.getElementById('dsm-tid').value;
   if(!tid)return;
   const tidTxns=fyTxns().filter(t=>t.tid===tid);
   if(tidTxns.length){
     const latest=tidTxns.reduce((a,b)=>a.date>b.date||(a.date===b.date&&a.createdAt>b.createdAt)?a:b);
-    document.getElementById('dsm-batch').value=latest.batch;
+    document.getElementById('dsm-batch').value=Number(latest.batch)+1;
   } else {
     document.getElementById('dsm-batch').value='';
   }
@@ -756,7 +756,7 @@ function onRecvTIDChange(){
   const tidTxns=fyTxns().filter(t=>t.tid===tid);
   if(tidTxns.length){
     const latest=tidTxns.reduce((a,b)=>a.date>b.date||(a.date===b.date&&a.createdAt>b.createdAt)?a:b);
-    document.getElementById('recv-batch').value=latest.batch;
+    document.getElementById('recv-batch').value=Number(latest.batch)+1;
   } else {document.getElementById('recv-batch').value='';}
 }
 
