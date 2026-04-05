@@ -244,6 +244,15 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   </div>
   <div style="background:var(--navy2);border-radius:10px 10px 0 0;padding:10px 13px;color:#fff;font-size:12px;font-weight:700;">📋 Transaction Report</div>
   <div class="tbl-wrap" style="border-radius:0 0 12px 12px;border-top:none;" id="rep-tbl"></div>
+
+  <!-- Customer Outstanding Dashboard -->
+  <div style="margin-top:16px;">
+    <div style="background:var(--navy2);border-radius:10px 10px 0 0;padding:10px 13px;color:#fff;font-size:12px;font-weight:700;display:flex;justify-content:space-between;align-items:center;">
+      <span>👥 Customer Outstanding — <span id="out-fy-label" style="color:var(--accent);"></span></span>
+      <button onclick="refreshOutstanding()" style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;">↻ Refresh</button>
+    </div>
+    <div class="tbl-wrap" style="border-radius:0 0 12px 12px;border-top:none;" id="outstanding-tbl"></div>
+  </div>
 </div>
 
 <!-- ═══ LEDGER ═══ -->
@@ -326,6 +335,34 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div><label>To Date</label><input type="date" id="del-to"></div>
     </div>
     <button onclick="showDeletePeriodModal()" style="background:transparent;border:1.5px solid #FECACA;color:var(--red);font-size:13px;font-weight:700;padding:11px;width:100%;border-radius:10px;cursor:pointer;">🗑 Delete Entries in This Period</button>
+  </div>
+
+  <!-- NOTIFICATIONS CARD -->
+  <div class="card">
+    <div class="card-title">🔔 Daily Summary Notification</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:11px;">Get a daily notification at the set time with today's entry count and totals. Browser must be open on Android Chrome.</p>
+    <div class="form-row">
+      <label>Notify me at</label>
+      <input type="time" id="notif-time" value="20:00">
+    </div>
+    <div id="notif-status" style="font-size:12px;font-weight:600;margin-bottom:10px;padding:8px 12px;border-radius:8px;background:#F0F9FF;color:var(--blue);display:none;"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary" onclick="enableNotifications()" id="notif-enable-btn">🔔 Enable Notifications</button>
+      <button class="btn btn-outline" onclick="testNotification()" id="notif-test-btn" style="display:none;">Test</button>
+    </div>
+    <button class="btn btn-outline" onclick="disableNotifications()" id="notif-disable-btn" style="display:none;margin-top:8px;border-color:#FECACA;color:var(--red);">Disable Notifications</button>
+  </div>
+
+  <!-- BACKUP & RESTORE CARD -->
+  <div class="card">
+    <div class="card-title">💾 Backup & Restore</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:13px;">Backup exports all data as a JSON file. Restore loads it back — requires PIN.</p>
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button class="btn btn-green" onclick="backupData()" style="flex:1;">⬇ Backup Now</button>
+      <button class="btn btn-outline" onclick="document.getElementById('restore-file').click()" style="flex:1;">⬆ Restore</button>
+    </div>
+    <input type="file" id="restore-file" accept=".json" style="display:none;" onchange="handleRestoreFile(event)">
+    <div id="backup-info" style="font-size:11px;color:var(--muted);text-align:center;"></div>
   </div>
 </div>
 
@@ -546,13 +583,13 @@ function switchTab(tab){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['dsm','recv','report','ledger','settings'][i]===tab));
   document.getElementById('page-'+tab).classList.add('active');
-  if(tab==='report')refreshReport();
+  if(tab==='report'){refreshReport();refreshOutstanding();}
   if(tab==='ledger'){
     document.getElementById('led-from').value=firstOfFY();
     document.getElementById('led-to').value=todayStr();
     populateLedgerFilters();
   }
-  if(tab==='settings')renderAll();
+  if(tab==='settings'){renderAll();updateNotifUI();updateBackupInfo();}
 }
 
 // ── DROPDOWNS ─────────────────────────────────────────────────────────────
@@ -643,13 +680,13 @@ async function saveOpeningBalance(){
 // ── DSM ENTRY ──────────────────────────────────────────────────────────────
 document.getElementById('dsm-date').value=todayStr();
 
-// Auto-fill batch +1 from latest transaction for selected TID
+// Auto-fill batch +1 from latest DEBIT entry for selected TID
 function onDsmTIDChange(){
   const tid=document.getElementById('dsm-tid').value;
   if(!tid)return;
   const tidTxns=fyTxns().filter(t=>t.tid===tid);
   if(tidTxns.length){
-    const latest=tidTxns.reduce((a,b)=>a.date>b.date||(a.date===b.date&&a.createdAt>b.createdAt)?a:b);
+    const latest=tidTxns.reduce((a,b)=>a.date>b.date||(a.date===b.date&&(a.createdAt||'')>(b.createdAt||''))?a:b);
     document.getElementById('dsm-batch').value=Number(latest.batch)+1;
   } else {
     document.getElementById('dsm-batch').value='';
@@ -753,9 +790,10 @@ document.getElementById('recv-date').value=todayStr();
 
 function onRecvTIDChange(){
   const tid=document.getElementById('recv-tid').value;if(!tid)return;
-  const tidTxns=fyTxns().filter(t=>t.tid===tid);
-  if(tidTxns.length){
-    const latest=tidTxns.reduce((a,b)=>a.date>b.date||(a.date===b.date&&a.createdAt>b.createdAt)?a:b);
+  // Only look at received entries for this TID
+  const tidRecv=fyRecv().filter(r=>r.tid===tid);
+  if(tidRecv.length){
+    const latest=tidRecv.reduce((a,b)=>a.date>b.date||(a.date===b.date&&(a.savedAt||'')>(b.savedAt||''))?a:b);
     document.getElementById('recv-batch').value=Number(latest.batch)+1;
   } else {document.getElementById('recv-batch').value='';}
 }
@@ -1219,6 +1257,255 @@ async function confirmDeletePeriod(from,to){
   setSyncStatus('ok');
 }
 
+// ── CUSTOMER OUTSTANDING ───────────────────────────────────────────────────
+function refreshOutstanding(){
+  document.getElementById('out-fy-label').textContent=fyLabel(activeFY);
+  const txns=fyTxns();
+  const recv=fyRecv();
+  const ob=getOB();
+
+  // Build map of all particulars
+  const allParties=new Set();
+  allParties.add('Fleet Card');
+  txns.forEach(t=>allParties.add(t.customer||'Fleet Card'));
+  recv.forEach(r=>allParties.add(r.customer||'Fleet Card'));
+  db.customers.forEach(c=>allParties.add(c));
+
+  const rows=[...allParties].map(party=>{
+    const isFC=(party==='Fleet Card');
+    const pTxns=txns.filter(t=>(t.customer||'Fleet Card')===party);
+    const pRecv=recv.filter(r=>(r.customer||'Fleet Card')===party);
+    const dr=pTxns.reduce((s,t)=>s+t.amount,0);
+    const cr=pRecv.reduce((s,r)=>s+r.amount,0);
+    const openingBal=isFC?ob:0;
+    const outstanding=dr-cr-openingBal; // positive = customer owes us (Dr), negative = we owe (Cr)
+    return{party,dr,cr,openingBal,outstanding,isFC};
+  }).filter(r=>r.dr>0||r.cr>0); // only show parties with activity
+
+  // Sort: Fleet Card first, then by outstanding descending
+  rows.sort((a,b)=>{
+    if(a.isFC)return-1;if(b.isFC)return 1;
+    return Math.abs(b.outstanding)-Math.abs(a.outstanding);
+  });
+
+  const tbl=document.getElementById('outstanding-tbl');
+  if(!rows.length){
+    tbl.innerHTML='<div class="empty"><div class="ico">👥</div><p>No data for this FY</p></div>';
+    return;
+  }
+
+  let h=`<table class="tbl"><thead><tr>
+    <th>Particulars</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th style="text-align:right">Outstanding</th>
+  </tr></thead><tbody>`;
+
+  rows.forEach(r=>{
+    const outColor=r.outstanding>0?'var(--red)':r.outstanding<0?'var(--green)':'var(--muted)';
+    const outLabel=r.outstanding>0?' Dr':r.outstanding<0?' Cr':'';
+    h+=`<tr${r.isFC?' style="background:#F0F9FF;"':''}>
+      <td style="font-weight:${r.isFC?'800':'600'};font-size:${r.isFC?'12':'11'}px;">${r.party}${r.isFC?` <span style="font-size:9px;background:#DBEAFE;color:var(--blue);padding:1px 5px;border-radius:8px;">OB:${fmtAmt(r.openingBal)}</span>`:''}
+      </td>
+      <td style="font-family:'Roboto Mono',monospace;font-weight:700;color:var(--red);text-align:right;font-size:12px;">${fmtAmt(r.dr)}</td>
+      <td style="font-family:'Roboto Mono',monospace;font-weight:700;color:var(--green);text-align:right;font-size:12px;">${fmtAmt(r.cr)}</td>
+      <td style="font-family:'Roboto Mono',monospace;font-weight:800;color:${outColor};text-align:right;font-size:12px;">${fmtAmt(Math.abs(r.outstanding))}${outLabel}</td>
+    </tr>`;
+  });
+
+  // Totals row
+  const totDr=rows.reduce((s,r)=>s+r.dr,0);
+  const totCr=rows.reduce((s,r)=>s+r.cr,0);
+  const totOut=rows.reduce((s,r)=>s+r.outstanding,0);
+  const totColor=totOut>0?'#FCA5A5':totOut<0?'#6EE7B7':'#fff';
+  h+=`</tbody><tfoot><tr>
+    <td>TOTAL</td>
+    <td style="font-family:'Roboto Mono',monospace;text-align:right;">${fmtAmt(totDr)}</td>
+    <td style="font-family:'Roboto Mono',monospace;text-align:right;">${fmtAmt(totCr)}</td>
+    <td style="font-family:'Roboto Mono',monospace;text-align:right;color:${totColor};">${fmtAmt(Math.abs(totOut))}${totOut>0?' Dr':totOut<0?' Cr':''}</td>
+  </tr></tfoot></table>`;
+  tbl.innerHTML=h;
+}
+
+// ── DAILY NOTIFICATION ─────────────────────────────────────────────────────
+let notifTimer=null;
+
+function updateNotifUI(){
+  const perm=Notification.permission;
+  const enabled=localStorage.getItem('fleet_notif_enabled')==='true';
+  const time=localStorage.getItem('fleet_notif_time')||'20:00';
+  document.getElementById('notif-time').value=time;
+  const statusEl=document.getElementById('notif-status');
+  const enableBtn=document.getElementById('notif-enable-btn');
+  const disableBtn=document.getElementById('notif-disable-btn');
+  const testBtn=document.getElementById('notif-test-btn');
+  if(!('Notification' in window)){
+    statusEl.style.display='block';statusEl.style.background='#FEF2F2';statusEl.style.color='var(--red)';
+    statusEl.textContent='⚠️ Notifications not supported on this browser/device.';
+    enableBtn.style.display='none';return;
+  }
+  if(perm==='denied'){
+    statusEl.style.display='block';statusEl.style.background='#FEF2F2';statusEl.style.color='var(--red)';
+    statusEl.textContent='⚠️ Notifications blocked. Please allow in browser settings.';
+    enableBtn.style.display='none';disableBtn.style.display='none';testBtn.style.display='none';return;
+  }
+  if(perm==='granted'&&enabled){
+    statusEl.style.display='block';statusEl.style.background='#D1FAE5';statusEl.style.color='#065F46';
+    statusEl.textContent=`✅ Notifications enabled — daily at ${time}`;
+    enableBtn.style.display='none';disableBtn.style.display='block';testBtn.style.display='block';
+  } else {
+    statusEl.style.display='none';
+    enableBtn.style.display='block';disableBtn.style.display='none';testBtn.style.display='none';
+  }
+}
+
+async function enableNotifications(){
+  if(!('Notification' in window))return toast('Not supported on this browser','err');
+  const perm=await Notification.requestPermission();
+  if(perm!=='granted'){toast('Permission denied','err');updateNotifUI();return;}
+  const time=document.getElementById('notif-time').value||'20:00';
+  localStorage.setItem('fleet_notif_enabled','true');
+  localStorage.setItem('fleet_notif_time',time);
+  scheduleNotification();
+  updateNotifUI();
+  toast('Notifications enabled ✓');
+}
+
+function disableNotifications(){
+  localStorage.setItem('fleet_notif_enabled','false');
+  if(notifTimer){clearTimeout(notifTimer);notifTimer=null;}
+  updateNotifUI();
+  toast('Notifications disabled');
+}
+
+function testNotification(){
+  sendDailySummaryNotif(true);
+}
+
+function buildSummaryText(isTest){
+  const today=todayStr();
+  const todayTxns=fyTxns().filter(t=>t.date===today);
+  const todayRecv=fyRecv().filter(r=>r.date===today);
+  const totalDr=todayTxns.reduce((s,t)=>s+t.amount,0);
+  const totalCr=todayRecv.reduce((s,r)=>s+r.amount,0);
+  const prefix=isTest?'[TEST] ':'';
+  if(!todayTxns.length&&!todayRecv.length)
+    return{title:`${prefix}⛽ Fleet Card`,body:'No entries today.'};
+  let body=`${todayTxns.length} debit entr${todayTxns.length!==1?'ies':'y'} · ₹${totalDr.toLocaleString('en-IN',{maximumFractionDigits:0})} debited`;
+  if(todayRecv.length)body+=` · ₹${totalCr.toLocaleString('en-IN',{maximumFractionDigits:0})} received`;
+  return{title:`${prefix}⛽ Fleet Card · Daily Summary`,body};
+}
+
+function sendDailySummaryNotif(isTest=false){
+  if(Notification.permission!=='granted')return;
+  const{title,body}=buildSummaryText(isTest);
+  new Notification(title,{body,icon:'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛽</text></svg>'});
+}
+
+function scheduleNotification(){
+  if(notifTimer){clearTimeout(notifTimer);notifTimer=null;}
+  if(localStorage.getItem('fleet_notif_enabled')!=='true')return;
+  if(Notification.permission!=='granted')return;
+  const time=localStorage.getItem('fleet_notif_time')||'20:00';
+  const[hh,mm]=time.split(':').map(Number);
+  const now=new Date();
+  const fire=new Date();
+  fire.setHours(hh,mm,0,0);
+  if(fire<=now)fire.setDate(fire.getDate()+1); // schedule for tomorrow if already past
+  const msUntil=fire-now;
+  notifTimer=setTimeout(()=>{
+    sendDailySummaryNotif();
+    scheduleNotification(); // reschedule for next day
+  },msUntil);
+}
+
+// Save notification time when changed
+document.addEventListener('DOMContentLoaded',()=>{
+  const nt=document.getElementById('notif-time');
+  if(nt)nt.addEventListener('change',()=>{
+    if(localStorage.getItem('fleet_notif_enabled')==='true'){
+      localStorage.setItem('fleet_notif_time',nt.value);
+      scheduleNotification();
+      updateNotifUI();
+      toast(`Notification time updated to ${nt.value}`);
+    }
+  });
+});
+
+// ── BACKUP & RESTORE ───────────────────────────────────────────────────────
+function backupData(){
+  const payload={
+    version:4,
+    exportedAt:new Date().toISOString(),
+    exportedFY:activeFY,
+    db:JSON.parse(JSON.stringify(db))
+  };
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`FleetCard_Backup_${activeFY}_${todayStr()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  // Update last backup info
+  localStorage.setItem('fleet_last_backup',new Date().toLocaleString('en-IN'));
+  updateBackupInfo();
+  toast('Backup downloaded ✓');
+}
+
+function updateBackupInfo(){
+  const el=document.getElementById('backup-info');
+  if(!el)return;
+  const last=localStorage.getItem('fleet_last_backup');
+  el.textContent=last?`Last backup: ${last}`:'No backup yet this session';
+}
+
+function handleRestoreFile(event){
+  const file=event.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=(e)=>{
+    try{
+      const payload=JSON.parse(e.target.result);
+      if(!payload.db||!payload.version)return toast('Invalid backup file','err');
+      // Ask for PIN via modal
+      showModal(`<div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:36px;margin-bottom:8px;">📂</div>
+        <div style="font-size:16px;font-weight:800;margin-bottom:6px;">Restore Backup</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">File: <strong>${file.name}</strong></div>
+        <div style="font-size:12px;color:var(--muted);">Exported: ${payload.exportedAt?new Date(payload.exportedAt).toLocaleString('en-IN'):'-'}</div>
+        <div style="font-size:12px;font-weight:700;color:var(--red);margin-top:8px;">⚠️ This will overwrite all current data.</div>
+      </div>
+      <div class="form-row"><label>Admin PIN</label><input type="password" id="restore-pin" placeholder="••••" maxlength="8" style="font-size:24px;text-align:center;letter-spacing:8px;font-family:'Roboto Mono',monospace;"></div>
+      <div id="restore-err" style="color:var(--red);font-size:12px;font-weight:700;text-align:center;margin-bottom:10px;display:none;">❌ Incorrect PIN</div>
+      <div style="display:flex;gap:9px;">
+        <button class="btn btn-green" onclick="confirmRestore()">✓ Restore</button>
+        <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      </div>`);
+      // Store parsed payload temporarily
+      window._pendingRestore=payload;
+      setTimeout(()=>{const p=document.getElementById('restore-pin');if(p)p.focus();},200);
+    }catch(err){toast('Could not read backup file','err');}
+  };
+  reader.readAsText(file);
+  // Reset file input so same file can be picked again
+  event.target.value='';
+}
+
+function confirmRestore(){
+  const pin=document.getElementById('restore-pin').value;
+  if(pin!==RESET_PIN){document.getElementById('restore-err').style.display='block';document.getElementById('restore-pin').value='';return;}
+  const payload=window._pendingRestore;
+  if(!payload){closeModal();return;}
+  // Restore
+  Object.assign(db,payload.db);
+  if(!db.fyOpeningBalances)db.fyOpeningBalances={};
+  if(!db.activeFYs)db.activeFYs=[getCurrentFY()];
+  saveLocal();
+  closeModal();
+  renderAll();
+  refreshOutstanding();
+  toast(`Restore complete ✓ — ${db.transactions.length} txns, ${db.received.length} received`);
+  window._pendingRestore=null;
+}
+
 // ── MODAL ──────────────────────────────────────────────────────────────────
 function showModal(html){document.getElementById('modal-body').innerHTML=html;document.getElementById('modal').classList.add('open');}
 function closeModal(){document.getElementById('modal').classList.remove('open');}
@@ -1226,6 +1513,9 @@ function maybeCloseModal(e){if(e.target===document.getElementById('modal'))close
 
 // ── INIT ───────────────────────────────────────────────────────────────────
 loadFromSheet();
+// Start notification scheduler on load
+scheduleNotification();
+
 </script>
 </body>
 </html>
