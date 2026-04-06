@@ -145,7 +145,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   </div>
   <div class="tabs">
     <div class="tab active" onclick="switchTab('dsm')">📥 DSM</div>
-    <div class="tab" onclick="switchTab('recv')">💰 Received</div>
+    <div class="tab" onclick="switchTab('recv')">✅ Verify</div>
     <div class="tab" onclick="switchTab('report')">📊 Report</div>
     <div class="tab" onclick="switchTab('ledger')">📒 Ledger</div>
     <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
@@ -182,30 +182,27 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <div id="dsm-recent"></div>
 </div>
 
-<!-- ═══ RECEIVED ═══ -->
+<!-- ═══ RECEIVED (Verification) ═══ -->
 <div class="page" id="page-recv">
   <div class="tiles">
     <div class="tile t-r"><div class="tile-val" id="ov-dr">₹0</div><div class="tile-lbl">Total Debit</div></div>
-    <div class="tile t-g"><div class="tile-val" id="ov-cr">₹0</div><div class="tile-lbl">Total Credit</div></div>
-    <div class="tile t-o"><div class="tile-val" id="ov-bal">₹0</div><div class="tile-lbl">FC Balance</div></div>
+    <div class="tile t-g"><div class="tile-val" id="ov-cr">₹0</div><div class="tile-lbl">Verified Credit</div></div>
+    <div class="tile t-o"><div class="tile-val" id="ov-bal">₹0</div><div class="tile-lbl">Pending Verify</div></div>
     <div class="tile t-b"><div class="tile-val" id="ov-ob">₹0</div><div class="tile-lbl">FC Opening Bal</div></div>
   </div>
-  <div class="card">
-    <div class="card-title">💳 Enter Credit Received</div>
-    <div class="form-row"><label>Select TID *</label><select id="recv-tid" onchange="onRecvTIDChange()"><option value="">— Choose TID —</option></select></div>
-    <div class="form-row"><label>Customer / Particulars</label><select id="recv-cust"></select></div>
-    <div class="form-row-2">
-      <div><label>Batch No. <span style="font-size:10px;color:var(--green);font-weight:600;">(auto-filled)</span></label><input type="number" id="recv-batch" placeholder="Auto from TID" min="1" style="background:#F0F9FF;border-color:#BAE6FD;"></div>
-      <div><label>Date</label><input type="date" id="recv-date"></div>
+  <div class="card" style="border-color:#D1FAE5;background:#F0FDF4;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <span style="font-size:18px;">ℹ️</span>
+      <div style="font-size:12px;font-weight:700;color:#065F46;">Credit Verification</div>
     </div>
-    <div class="form-row">
-      <label>Credit Amount (₹)</label>
-      <div class="big-wrap"><span class="big-sym">₹</span><input type="number" id="recv-amount" class="big-input" placeholder="0.00" min="0" step="0.01"></div>
-    </div>
-    <div class="form-row" style="margin-bottom:4px;"><label>Note (optional)</label><input type="text" id="recv-note" placeholder="e.g. Reference no."></div>
-    <button class="btn btn-green" onclick="saveRecv()" style="margin-top:11px;">✓ Save Credit Entry</button>
+    <div style="font-size:12px;color:#047857;line-height:1.5;">DSM entries below are from transaction slips already generated. Tap <strong>✓ Mark as Credited</strong> on each entry once the amount is confirmed credited in the account.</div>
   </div>
-  <div class="sh"><div class="sh-title">Recent Credits</div><div class="sh-count" id="recv-count"></div></div>
+  <div style="display:flex;gap:7px;margin-bottom:12px;" id="recv-filter-chips">
+    <div class="chip active" onclick="setRecvFilter('pending',this)">⏳ Pending</div>
+    <div class="chip" onclick="setRecvFilter('verified',this)">✅ Verified</div>
+    <div class="chip" onclick="setRecvFilter('all',this)">All</div>
+  </div>
+  <div class="sh"><div class="sh-title" id="recv-list-title">Pending Verification</div><div class="sh-count" id="recv-count"></div></div>
   <div id="recv-list"></div>
 </div>
 
@@ -594,14 +591,14 @@ function switchTab(tab){
 
 // ── DROPDOWNS ─────────────────────────────────────────────────────────────
 function populateDropdowns(){
-  ['dsm-tid','recv-tid','rep-tid','led-tid'].forEach(id=>{
+  ['dsm-tid','rep-tid','led-tid'].forEach(id=>{
     const sel=document.getElementById(id);if(!sel)return;
     const cur=sel.value||'ALL';
-    const opts=(id==='dsm-tid'||id==='recv-tid')?'<option value="">— Choose TID —</option>':'<option value="ALL">All TIDs</option>';
+    const opts=(id==='dsm-tid')?'<option value="">— Choose TID —</option>':'<option value="ALL">All TIDs</option>';
     sel.innerHTML=opts+(db.tids||[]).map(t=>`<option${t===cur?' selected':''}>${t}</option>`).join('');
   });
   const custs=['Fleet Card',...(db.customers||[])];
-  ['dsm-cust','recv-cust'].forEach(id=>{
+  ['dsm-cust'].forEach(id=>{
     const sel=document.getElementById(id);if(!sel)return;
     const cur=sel.value||'Fleet Card';
     sel.innerHTML=custs.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
@@ -781,119 +778,116 @@ async function saveEditTxn(id){
 async function delTxn(id){
   if(!confirm('Delete this entry?'))return;
   db.transactions=db.transactions.filter(t=>t.id!==id);
+  // Also remove verification mark and linked received entry
+  if(creditedMap[id]){
+    delete creditedMap[id];saveCreditedMap();
+    db.received=db.received.filter(r=>r.linkedTxnId!==id);
+  }
   refreshDSM();saveLocal();toast('Deleted','err');
   setSyncStatus('syncing');await apiPost({action:'deleteTransaction',id});setSyncStatus('ok');
 }
 
-// ── RECEIVED ───────────────────────────────────────────────────────────────
-document.getElementById('recv-date').value=todayStr();
+// ── RECEIVED / VERIFICATION ────────────────────────────────────────────────
+// creditedMap: { txn_id: { creditedAt, creditedBy } }  stored in localStorage
+let creditedMap = {};
+function loadCreditedMap(){
+  try{const s=localStorage.getItem('fleet_credited_map');if(s)creditedMap=JSON.parse(s);}catch{}
+}
+function saveCreditedMap(){localStorage.setItem('fleet_credited_map',JSON.stringify(creditedMap));}
+loadCreditedMap();
 
-function onRecvTIDChange(){
-  const tid=document.getElementById('recv-tid').value;if(!tid)return;
-  // Only look at received entries for this TID
-  const tidRecv=fyRecv().filter(r=>r.tid===tid);
-  if(tidRecv.length){
-    const latest=tidRecv.reduce((a,b)=>a.date>b.date||(a.date===b.date&&(a.savedAt||'')>(b.savedAt||''))?a:b);
-    document.getElementById('recv-batch').value=Number(latest.batch)+1;
-  } else {document.getElementById('recv-batch').value='';}
+let recvFilter='pending'; // 'pending' | 'verified' | 'all'
+function setRecvFilter(f,el){
+  recvFilter=f;
+  document.querySelectorAll('#recv-filter-chips .chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  const titles={pending:'Pending Verification',verified:'Verified — Credited',all:'All DSM Entries'};
+  document.getElementById('recv-list-title').textContent=titles[f];
+  refreshRecv();
 }
 
-async function saveRecv(){
-  const tid=document.getElementById('recv-tid').value.trim();
-  const customer=document.getElementById('recv-cust').value||'Fleet Card';
-  const batch=document.getElementById('recv-batch').value.trim();
-  const date=document.getElementById('recv-date').value;
-  const amount=parseFloat(document.getElementById('recv-amount').value);
-  const note=document.getElementById('recv-note').value.trim();
-  if(!tid)return toast('Select a TID — required','err');
-  if(!batch)return toast('Batch number required','err');
-  if(!date)return toast('Select a date','err');
-  if(!amount||amount<=0)return toast('Enter a valid amount','err');
-  if(!inFY(date,activeFY)){const{from,to}=fyDates(activeFY);if(!confirm(`Date ${fmtDate(date)} is outside ${fyLabel(activeFY)}. Save anyway?`))return;}
-  const entry={id:uid(),tid,customer,batch,date,amount,note,savedAt:new Date().toISOString()};
-  db.received.push(entry);
-  const entryFY=dateToFY(date);
-  if(entryFY&&!db.activeFYs.includes(entryFY)){db.activeFYs=[...db.activeFYs,entryFY].sort();}
-  document.getElementById('recv-amount').value='';
-  document.getElementById('recv-batch').value='';
-  document.getElementById('recv-note').value='';
-  document.getElementById('recv-tid').value='';
-  toast(`Saved ✓  ${customer}  ${fmtAmt(amount)}`);
-  refreshRecv();saveLocal();
-  setSyncStatus('syncing');await apiPost({action:'saveReceived',data:entry});setSyncStatus('ok');
+async function markCredited(txnId){
+  const note=document.getElementById('note-'+txnId)?document.getElementById('note-'+txnId).value.trim():'';
+  creditedMap[txnId]={creditedAt:new Date().toISOString(),note:note||''};
+  saveCreditedMap();
+  // Also store in db.received for reports — create a matching credit entry
+  const txn=db.transactions.find(t=>t.id===txnId);
+  if(txn&&!db.received.find(r=>r.linkedTxnId===txnId)){
+    const entry={id:uid(),tid:txn.tid,customer:txn.customer,batch:txn.batch,date:txn.date,amount:txn.amount,note:'Verified credit'+(note?' — '+note:''),savedAt:new Date().toISOString(),linkedTxnId:txnId};
+    db.received.push(entry);saveLocal();
+    setSyncStatus('syncing');await apiPost({action:'saveReceived',data:entry});setSyncStatus('ok');
+  }
+  toast('✅ Marked as Credited!');
+  refreshRecv();
+}
+
+async function unmarkCredited(txnId){
+  if(!confirm('Remove credit verification for this entry?'))return;
+  delete creditedMap[txnId];
+  saveCreditedMap();
+  // Remove linked received entry if exists
+  const linked=db.received.find(r=>r.linkedTxnId===txnId);
+  if(linked){
+    db.received=db.received.filter(r=>r.linkedTxnId!==txnId);
+    saveLocal();
+    setSyncStatus('syncing');await apiPost({action:'deleteReceived',id:linked.id});setSyncStatus('ok');
+  }
+  toast('Verification removed','err');
+  refreshRecv();
 }
 
 function refreshRecv(){
-  const allT=fyTxns(),allR=fyRecv();
-  const fcT=allT.filter(t=>t.customer==='Fleet Card'||!t.customer);
-  const fcR=allR.filter(r=>r.customer==='Fleet Card'||!r.customer);
+  const allT=fyTxns();
+  const verifiedTxns=allT.filter(t=>creditedMap[t.id]);
+  const pendingTxns=allT.filter(t=>!creditedMap[t.id]);
   const totalDr=allT.reduce((s,t)=>s+t.amount,0);
-  const totalCr=allR.reduce((s,r)=>s+r.amount,0);
-  const fcDr=fcT.reduce((s,t)=>s+t.amount,0);
-  const fcCr=fcR.reduce((s,r)=>s+r.amount,0);
+  const totalCr=verifiedTxns.reduce((s,t)=>s+t.amount,0);
+  const pendingAmt=pendingTxns.reduce((s,t)=>s+t.amount,0);
   const ob=getOB();
-  const bal=ob+fcCr-fcDr;
   document.getElementById('ov-dr').textContent=fmtAmt(totalDr);
   document.getElementById('ov-cr').textContent=fmtAmt(totalCr);
-  document.getElementById('ov-bal').textContent=fmtAmt(bal);
+  document.getElementById('ov-bal').textContent=fmtAmt(pendingAmt);
   document.getElementById('ov-ob').textContent=fmtAmt(ob);
 
-  const sorted=[...allR].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
-  document.getElementById('recv-count').textContent=`${allR.length} entr${allR.length!==1?'ies':'y'}`;
-  document.getElementById('recv-list').innerHTML=sorted.length?sorted.map(r=>`
-    <div class="entry-item">
-      <div class="entry-top">
-        <div>
-          <div class="e-main">${r.tid?r.tid+' · ':''}Batch #${r.batch}</div>
-          <div class="e-sub">👤 ${r.customer||'Fleet Card'} · 📅 ${fmtDate(r.date)}${r.note?' · '+r.note:''}</div>
-        </div>
-        <div><div class="e-amt credit">${fmtAmt(r.amount)}</div><div class="e-meta">Credit</div></div>
-      </div>
-      <div class="entry-actions">
-        <button class="btn btn-sm btn-edit" onclick="editRecv('${r.id}')">✏️ Edit</button>
-        <button class="btn btn-sm btn-del" onclick="delRecv('${r.id}')">✕ Delete</button>
-      </div>
-    </div>`).join(''):'<div class="empty"><div class="ico">💳</div><p>No received entries in this FY</p></div>';
-}
+  let showList;
+  if(recvFilter==='pending')showList=pendingTxns;
+  else if(recvFilter==='verified')showList=verifiedTxns;
+  else showList=allT;
+  showList=[...showList].sort((a,b)=>b.date.localeCompare(a.date));
 
-function editRecv(id){
-  const r=db.received.find(x=>x.id===id);if(!r)return;
-  const tOpts=(db.tids||[]).map(x=>`<option${x===r.tid?' selected':''}>${x}</option>`).join('');
-  const custs=['Fleet Card',...(db.customers||[])];
-  const cOpts=custs.map(c=>`<option${c===r.customer?' selected':''}>${c}</option>`).join('');
-  showModal(`<div style="font-size:16px;font-weight:700;margin-bottom:14px;">✏️ Edit Credit Entry</div>
-    <div class="form-row"><label>TID</label><select id="er-tid">${tOpts}</select></div>
-    <div class="form-row"><label>Customer</label><select id="er-cust">${cOpts}</select></div>
-    <div class="form-row-2">
-      <div><label>Batch No.</label><input type="number" id="er-batch" value="${r.batch}" min="1"></div>
-      <div><label>Date</label><input type="date" id="er-date" value="${r.date}"></div>
-    </div>
-    <div class="form-row"><label>Amount (₹)</label><input type="number" id="er-amount" value="${r.amount}" min="0" step="0.01"></div>
-    <div class="form-row"><label>Note</label><input type="text" id="er-note" value="${r.note||''}"></div>
-    <div style="display:flex;gap:9px;">
-      <button class="btn btn-green" onclick="saveEditRecv('${id}')">✓ Save</button>
-      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-    </div>`);
-}
-async function saveEditRecv(id){
-  const tid=document.getElementById('er-tid').value;
-  const customer=document.getElementById('er-cust').value;
-  const batch=document.getElementById('er-batch').value.trim();
-  const date=document.getElementById('er-date').value;
-  const amount=parseFloat(document.getElementById('er-amount').value);
-  const note=document.getElementById('er-note').value.trim();
-  if(!tid)return toast('Select a TID','err');
-  if(!batch||!date||!amount||amount<=0)return toast('Fill all fields','err');
-  const i=db.received.findIndex(r=>r.id===id);
-  if(i>=0)db.received[i]={...db.received[i],tid,customer,batch,date,amount,note};
-  closeModal();refreshRecv();saveLocal();toast('Updated ✓');
-  setSyncStatus('syncing');await apiPost({action:'updateReceived',data:db.received[i>=0?i:0]});setSyncStatus('ok');
-}
-async function delRecv(id){
-  if(!confirm('Delete this entry?'))return;
-  db.received=db.received.filter(r=>r.id!==id);
-  refreshRecv();saveLocal();toast('Deleted','err');
-  setSyncStatus('syncing');await apiPost({action:'deleteReceived',id});setSyncStatus('ok');
+  document.getElementById('recv-count').textContent=`${showList.length} entr${showList.length!==1?'ies':'y'}`;
+
+  const emptyMsg=recvFilter==='pending'
+    ?'<div class="ico">✅</div><p>All entries verified!</p>'
+    :recvFilter==='verified'
+    ?'<div class="ico">⏳</div><p>No verified entries yet</p>'
+    :'<div class="ico">📋</div><p>No DSM entries in this FY</p>';
+
+  document.getElementById('recv-list').innerHTML=showList.length?showList.map(t=>{
+    const isVerified=!!creditedMap[t.id];
+    const v=creditedMap[t.id]||{};
+    const verifiedTime=v.creditedAt?new Date(v.creditedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+    return`<div class="entry-item" style="border-left:4px solid ${isVerified?'var(--green)':'var(--accent)'};${isVerified?'opacity:.85':''}">
+      <div class="entry-top">
+        <div style="flex:1;">
+          <div class="e-main">${t.tid?t.tid+' · ':''}Batch #${t.batch}</div>
+          <div class="e-sub">👤 ${t.customer||'Fleet Card'} · 📅 ${fmtDate(t.date)}</div>
+          ${isVerified?`<div style="font-size:10px;color:var(--green);font-weight:700;margin-top:4px;">✅ Credited verified · ${verifiedTime}${v.note?' · '+v.note:''}</div>`
+            :`<div style="margin-top:8px;"><input type="text" id="note-${t.id}" placeholder="Note / Ref no. (optional)" style="font-size:12px;padding:7px 10px;border-radius:8px;border:1.5px solid var(--border);width:100%;background:#FAFAFA;font-family:'DM Sans',sans-serif;color:var(--text);" /></div>`}
+        </div>
+        <div style="text-align:right;margin-left:10px;flex-shrink:0;">
+          <div class="e-amt debit">${fmtAmt(t.amount)}</div>
+          <div class="e-meta">Debit</div>
+        </div>
+      </div>
+      <div class="entry-actions" style="margin-top:8px;">
+        ${isVerified
+          ?`<button class="btn btn-sm" style="background:#ECFDF5;color:#065F46;border:1px solid #A7F3D0;flex:1;cursor:default;">✅ Credited in Account</button>
+             <button class="btn btn-sm btn-del" onclick="unmarkCredited('${t.id}')" style="flex:0;">✕</button>`
+          :`<button class="btn btn-sm btn-green" onclick="markCredited('${t.id}')" style="flex:1;padding:9px;">✓ Mark as Credited</button>`}
+      </div>
+    </div>`;
+  }).join(''):`<div class="empty">${emptyMsg}</div>`;
 }
 
 // ── REPORT ─────────────────────────────────────────────────────────────────
@@ -960,9 +954,13 @@ function refreshReport(){
 
   const tbl=document.getElementById('rep-tbl');
   if(!combined.length){tbl.innerHTML='<div class="empty"><div class="ico">📊</div><p>No data for this period</p></div>';return;}
-  let h=`<table class="tbl"><thead><tr><th>Date</th><th>TID</th><th>Batch</th><th>Particulars</th><th>Debit</th><th>Credit</th></tr></thead><tbody>`;
+  let h=`<table class="tbl"><thead><tr><th>Date</th><th>TID</th><th>Batch</th><th>Particulars</th><th>Debit</th><th>Credit</th><th>Status</th></tr></thead><tbody>`;
   combined.forEach(e=>{
     const isD=e.type==='debit';
+    const verified=isD&&creditedMap[e.id];
+    const statusCell=isD
+      ?(verified?'<span style="color:#059669;font-weight:700;font-size:11px;">✅ Credited</span>':'<span style="color:#F59E0B;font-weight:700;font-size:11px;">⏳ Pending</span>')
+      :'—';
     h+=`<tr>
       <td style="white-space:nowrap;">${fmtDate(e.date)}</td>
       <td style="font-family:'Roboto Mono',monospace;font-size:11px;">${e.tid||'—'}</td>
@@ -970,9 +968,10 @@ function refreshReport(){
       <td style="font-weight:600;">${e.customer||'Fleet Card'}</td>
       <td style="font-family:'Roboto Mono',monospace;color:var(--red);font-weight:700;">${isD?fmtAmt(e.amount):'—'}</td>
       <td style="font-family:'Roboto Mono',monospace;color:var(--green);font-weight:700;">${!isD?fmtAmt(e.amount):'—'}</td>
+      <td>${statusCell}</td>
     </tr>`;
   });
-  h+=`</tbody><tfoot><tr><td colspan="4">TOTAL</td><td style="font-family:'Roboto Mono',monospace;">${fmtAmt(totalDr)}</td><td style="font-family:'Roboto Mono',monospace;">${fmtAmt(totalCr)}</td></tr></tfoot></table>`;
+  h+=`</tbody><tfoot><tr><td colspan="4">TOTAL</td><td style="font-family:'Roboto Mono',monospace;">${fmtAmt(totalDr)}</td><td style="font-family:'Roboto Mono',monospace;">${fmtAmt(totalCr)}</td><td></td></tr></tfoot></table>`;
   tbl.innerHTML=h;
 }
 
@@ -1248,6 +1247,8 @@ async function confirmDeletePeriod(from,to){
   const recvIds=db.received.filter(r=>r.date>=from&&r.date<=to).map(r=>r.id);
   db.transactions=db.transactions.filter(t=>!txnIds.includes(t.id));
   db.received=db.received.filter(r=>!recvIds.includes(r.id));
+  // Also remove verification marks for deleted txns
+  txnIds.forEach(id=>{delete creditedMap[id];});saveCreditedMap();
   saveLocal();closeModal();refreshDSM();refreshRecv();
   toast(`Deleted ${txnIds.length} debit + ${recvIds.length} credit entries`,'err');
   // Delete from sheet one by one
