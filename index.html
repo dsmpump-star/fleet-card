@@ -450,15 +450,16 @@ async function apiGet(action){
     setTimeout(()=>{if(window[cb]){delete window[cb];s.remove();reject(new Error('timeout'));}},10000);
   });
 }
+let _isOnline=true; // track real connectivity
 async function apiPost(payload){
   return new Promise((resolve)=>{
     const s=document.createElement('script');
     const cb='_cb'+Date.now();
-    window[cb]=(data)=>{resolve(data);delete window[cb];s.remove();};
-    s.onerror=()=>{resolve({success:true});s.remove();};
+    window[cb]=(data)=>{_isOnline=true;resolve({success:true,...data});delete window[cb];s.remove();};
+    s.onerror=()=>{_isOnline=false;resolve({success:false});s.remove();};
     s.src=`${SHEET_URL}?payload=${encodeURIComponent(JSON.stringify(payload))}&callback=${cb}`;
     document.head.appendChild(s);
-    setTimeout(()=>{if(window[cb]){delete window[cb];s.remove();resolve({success:true});}},10000);
+    setTimeout(()=>{if(window[cb]){delete window[cb];s.remove();_isOnline=false;resolve({success:false});}},10000);
   });
 }
 
@@ -489,6 +490,22 @@ async function loadFromSheet(){
       for(const name of DEFAULT_CUSTOMERS){apiPost({action:'saveCustomer',name});}
     } else {
       db.customers=remote.customers;
+    }
+    // Reconcile: for any creditedMap entry, ensure a linked received record exists in db
+    // (Sheet may not store linkedTxnId field, so we match by txnId stored in creditedMap)
+    loadCreditedMap(); // reload in case updated elsewhere
+    const linkedIds=new Set(db.received.filter(r=>r.linkedTxnId).map(r=>r.linkedTxnId));
+    for(const txnId of Object.keys(creditedMap)){
+      if(!linkedIds.has(txnId)){
+        const txn=db.transactions.find(t=>t.id===txnId);
+        if(txn){
+          const v=creditedMap[txnId];
+          const entry={id:uid(),tid:txn.tid,customer:txn.customer,batch:txn.batch,date:txn.date,
+            amount:txn.amount,note:'Verified credit'+(v.note?' - '+v.note:''),
+            savedAt:v.creditedAt||new Date().toISOString(),linkedTxnId:txnId};
+          db.received.push(entry);
+        }
+      }
     }
     saveLocal();
     setSyncStatus('ok');
@@ -634,12 +651,12 @@ async function addTID(){
   if(!val)return toast('Enter a TID','err');
   if((db.tids||[]).includes(val))return toast('TID already exists','err');
   db.tids.push(val);inp.value='';renderTIDs();toast(`${val} added`);saveLocal();
-  setSyncStatus('syncing');await apiPost({action:'saveTID',tid:val});setSyncStatus('ok');
+  {const r=await apiPost({action:'saveTID',tid:val});setSyncStatus(r.success?'ok':'err');}
 }
 async function removeTID(t){
   if(db.transactions.some(x=>x.tid===t))return toast('Cannot remove — has transactions','err');
   db.tids=db.tids.filter(x=>x!==t);renderTIDs();toast(`${t} removed`,'err');saveLocal();
-  setSyncStatus('syncing');await apiPost({action:'deleteTID',tid:t});setSyncStatus('ok');
+  {const r=await apiPost({action:'deleteTID',tid:t});setSyncStatus(r.success?'ok':'err');}
 }
 
 // ── CUSTOMERS ──────────────────────────────────────────────────────────────
@@ -657,13 +674,13 @@ async function addCustomer(){
   if(!val)return toast('Enter customer name','err');
   if(val==='FLEET CARD'||(db.customers||[]).includes(val))return toast('Already exists','err');
   db.customers.push(val);inp.value='';renderCustomers();toast(`${val} added`);saveLocal();
-  setSyncStatus('syncing');await apiPost({action:'saveCustomer',name:val});setSyncStatus('ok');
+  {const r=await apiPost({action:'saveCustomer',name:val});setSyncStatus(r.success?'ok':'err');}
 }
 async function removeCustomer(name){
   if(db.transactions.some(t=>t.customer===name)||db.received.some(r=>r.customer===name))
     return toast('Cannot remove — has entries','err');
   db.customers=db.customers.filter(c=>c!==name);renderCustomers();toast('Removed','err');saveLocal();
-  setSyncStatus('syncing');await apiPost({action:'deleteCustomer',name});setSyncStatus('ok');
+  {const r=await apiPost({action:'deleteCustomer',name});setSyncStatus(r.success?'ok':'err');}
 }
 
 // ── OPENING BALANCE (per FY) ────────────────────────────────────────────────
@@ -671,7 +688,7 @@ async function saveOpeningBalance(){
   const val=parseFloat(document.getElementById('ob-input').value)||0;
   db.fyOpeningBalances[activeFY]=val;saveLocal();toast(`Opening balance for ${fyLabel(activeFY)} set to ${fmtAmt(val)}`);
   refreshRecv();renderFYList();
-  setSyncStatus('syncing');await apiPost({action:'saveFYOpeningBalance',fy:activeFY,amount:val});setSyncStatus('ok');
+  {const r=await apiPost({action:'saveFYOpeningBalance',fy:activeFY,amount:val});setSyncStatus(r.success?'ok':'err');}
 }
 
 // ── DSM ENTRY ──────────────────────────────────────────────────────────────
@@ -712,7 +729,7 @@ async function saveDSM(){
   document.getElementById('dsm-batch').value='';
   toast(`Saved ✓  ${customer}  Batch #${batch}  ${fmtAmt(amount)}`);
   refreshDSM();saveLocal();
-  setSyncStatus('syncing');await apiPost({action:'saveTransaction',data:entry});setSyncStatus('ok');
+  {const r=await apiPost({action:'saveTransaction',data:entry});setSyncStatus(r.success?'ok':'err');}
 }
 
 function refreshDSM(){
@@ -773,7 +790,7 @@ async function saveEditTxn(id){
   const i=db.transactions.findIndex(t=>t.id===id);
   if(i>=0)db.transactions[i]={...db.transactions[i],tid,customer,batch,date,amount};
   closeModal();refreshDSM();saveLocal();toast('Updated ✓');
-  setSyncStatus('syncing');await apiPost({action:'updateTransaction',data:db.transactions[i>=0?i:0]});setSyncStatus('ok');
+  {const r=await apiPost({action:'updateTransaction',data:db.transactions[i>=0?i:0]});setSyncStatus(r.success?'ok':'err');}
 }
 async function delTxn(id){
   if(!confirm('Delete this entry?'))return;
@@ -784,7 +801,7 @@ async function delTxn(id){
     db.received=db.received.filter(r=>r.linkedTxnId!==id);
   }
   refreshDSM();saveLocal();toast('Deleted','err');
-  setSyncStatus('syncing');await apiPost({action:'deleteTransaction',id});setSyncStatus('ok');
+  {const r=await apiPost({action:'deleteTransaction',id});setSyncStatus(r.success?'ok':'err');}
 }
 
 // ── RECEIVED / VERIFICATION ────────────────────────────────────────────────
@@ -807,30 +824,36 @@ function setRecvFilter(f,el){
 }
 
 async function markCredited(txnId){
-  const note=document.getElementById('note-'+txnId)?document.getElementById('note-'+txnId).value.trim():'';
+  const noteEl=document.getElementById('note-'+txnId);
+  const note=noteEl?noteEl.value.trim():'';
+  // Save immediately to creditedMap and re-render — UI updates instantly
   creditedMap[txnId]={creditedAt:new Date().toISOString(),note:note||''};
   saveCreditedMap();
-  // Also store in db.received for reports — create a matching credit entry
+  refreshRecv(); // instant: entry disappears from Pending view right away
+  toast('✅ Marked as Credited!');
+  // Background: create linked received entry in db + sync to sheet
   const txn=db.transactions.find(t=>t.id===txnId);
   if(txn&&!db.received.find(r=>r.linkedTxnId===txnId)){
-    const entry={id:uid(),tid:txn.tid,customer:txn.customer,batch:txn.batch,date:txn.date,amount:txn.amount,note:'Verified credit'+(note?' — '+note:''),savedAt:new Date().toISOString(),linkedTxnId:txnId};
-    db.received.push(entry);saveLocal();
-    setSyncStatus('syncing');await apiPost({action:'saveReceived',data:entry});setSyncStatus('ok');
+    const entry={id:uid(),tid:txn.tid,customer:txn.customer,batch:txn.batch,date:txn.date,
+      amount:txn.amount,note:'Verified credit'+(note?' - '+note:''),
+      savedAt:new Date().toISOString(),linkedTxnId:txnId};
+    db.received.push(entry);
+    saveLocal();
+    apiPost({action:'saveReceived',data:entry}).catch(()=>{}); // background, no sync flicker
   }
-  toast('✅ Marked as Credited!');
-  refreshRecv();
 }
 
 async function unmarkCredited(txnId){
   if(!confirm('Remove credit verification for this entry?'))return;
   delete creditedMap[txnId];
   saveCreditedMap();
-  // Remove linked received entry if exists
+  // Remove linked received entry
   const linked=db.received.find(r=>r.linkedTxnId===txnId);
   if(linked){
+    const linkedId=linked.id;
     db.received=db.received.filter(r=>r.linkedTxnId!==txnId);
     saveLocal();
-    setSyncStatus('syncing');await apiPost({action:'deleteReceived',id:linked.id});setSyncStatus('ok');
+    apiPost({action:'deleteReceived',id:linkedId}).catch(()=>{}); // background
   }
   toast('Verification removed','err');
   refreshRecv();
@@ -1514,8 +1537,9 @@ function maybeCloseModal(e){if(e.target===document.getElementById('modal'))close
 
 // ── INIT ───────────────────────────────────────────────────────────────────
 loadFromSheet();
-// Start notification scheduler on load
 scheduleNotification();
+// Auto-refresh every 3 min to keep sync status accurate
+setInterval(()=>{if(!document.hidden)loadFromSheet();},3*60*1000);
 
 </script>
 </body>
