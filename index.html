@@ -274,7 +274,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
     <div class="export-row">
       <button class="btn btn-accent" onclick="exportLedgerExcel()">⬇ Excel</button>
-      <button class="btn btn-primary" onclick="exportLedgerPDF()">⬇ PDF</button>
+      <button class="btn btn-primary" onclick="exportLedgerPDF(false)" style="flex:1;">👁 Preview PDF</button>
+      <button class="btn btn-outline" onclick="exportLedgerPDF(true)" style="flex:1;font-size:12px;">⊟ Compact PDF</button>
     </div>
     <div class="ledger-wrap">
       <div class="ledger-hdr">
@@ -1217,8 +1218,9 @@ function exportPDF(){
   w.document.close();toast('PDF opened!');
 }
 
-function exportLedgerPDF(){
+function buildLedgerHTML(compact){
   const from=document.getElementById('led-from').value,to=document.getElementById('led-to').value;
+  if(!from||!to){toast('Select date range first','err');return null;}
   const tid=document.getElementById('led-tid').value,cust=document.getElementById('led-cust').value;
   let txns=db.transactions.filter(t=>t.date>=from&&t.date<=to);
   let recv=db.received.filter(r=>r.date>=from&&r.date<=to);
@@ -1233,39 +1235,73 @@ function exportLedgerPDF(){
   const totalDr=txns.reduce((s,t)=>s+t.amount,0),totalCr=recv.reduce((s,r)=>s+r.amount,0);
   const cb=ob+totalCr-totalDr;
   const particularsLabel=cust==='ALL'?'All':cust==='ALL_CUSTOMERS'?'All Customers':cust;
+  // compact: smaller font, tighter rows, landscape
+  const fs=compact?'8px':'12px', pad=compact?'3px 5px':'8px 10px', hpad=compact?'4px 5px':'8px 10px';
   let rows='';
   if(isFC){rows=`<tr style="background:#EFF6FF;"><td colspan="4" style="font-weight:700;">OPENING BALANCE</td><td></td><td></td><td style="font-family:monospace;font-weight:700;color:#0369A1;">₹${ob.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>`;}
   combined.forEach(e=>{
     const isD=e.type==='debit';
     if(isD)bal-=e.amount;else bal+=e.amount;
     const bc=bal<0?'#DC2626':bal>0?'#0C3547':'#888';
-    rows+=`<tr><td>${fmtDate(e.date)}</td><td>${e.customer||'Fleet Card'}</td><td>${e.tid||'—'}</td><td>#${e.batch}</td><td style="color:#DC2626;font-family:monospace;font-weight:700;">${isD?'₹'+e.amount.toLocaleString('en-IN',{minimumFractionDigits:2}):''}</td><td style="color:#059669;font-family:monospace;font-weight:700;">${!isD?'₹'+e.amount.toLocaleString('en-IN',{minimumFractionDigits:2}):''}</td><td style="font-family:monospace;font-weight:700;color:${bc};">₹${Math.abs(bal).toLocaleString('en-IN',{minimumFractionDigits:2})}${bal<0?' Dr':bal>0?' Cr':''}</td></tr>`;
+    rows+=`<tr><td>${fmtDate(e.date)}</td><td>${e.customer||'Fleet Card'}</td><td>${e.tid||'—'}</td><td>#${e.batch}</td><td style="color:#DC2626;font-family:monospace;font-weight:700;text-align:right;">${isD?'₹'+e.amount.toLocaleString('en-IN',{minimumFractionDigits:2}):''}</td><td style="color:#059669;font-family:monospace;font-weight:700;text-align:right;">${!isD?'₹'+e.amount.toLocaleString('en-IN',{minimumFractionDigits:2}):''}</td><td style="font-family:monospace;font-weight:700;color:${bc};text-align:right;">₹${Math.abs(bal).toLocaleString('en-IN',{minimumFractionDigits:2})}${bal<0?' Dr':bal>0?' Cr':''}</td></tr>`;
   });
-  rows+=`<tr style="background:#F5FAFE;font-weight:700;"><td colspan="4">SUB TOTAL</td><td style="font-family:monospace;color:#DC2626;">₹${totalDr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;color:#059669;">₹${totalCr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td></td></tr>
-  <tr style="background:#164E63;color:#fff;font-weight:700;"><td colspan="4">TOTAL</td><td style="font-family:monospace;">₹${Math.max(totalDr,totalCr).toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;">₹${Math.max(totalDr,totalCr).toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td></td></tr>
-  <tr style="background:#0C3547;color:#fff;font-weight:800;"><td colspan="6">CLOSING BALANCE</td><td style="font-family:monospace;color:${cb<0?'#FCA5A5':cb>0?'#6EE7B7':'#fff'};">₹${Math.abs(cb).toLocaleString('en-IN',{minimumFractionDigits:2})} ${cb<0?'Dr':cb>0?'Cr':''}</td></tr>`;
-  const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><title>Fleet Card Ledger</title>
-  <style>body{font-family:Arial,sans-serif;font-size:12px;padding:24px;}h1{font-size:18px;margin-bottom:4px;}
-  .meta{color:#888;font-size:11px;margin-bottom:14px;}.summary{display:flex;gap:10px;margin-bottom:16px;}
-  .sbox{background:#F5FAFE;border:1px solid #D1E4EE;border-radius:8px;padding:10px 14px;flex:1;text-align:center;}
-  .sval{font-size:15px;font-weight:700;font-family:monospace;}.slbl{font-size:10px;color:#888;text-transform:uppercase;margin-top:2px;}
-  table{width:100%;border-collapse:collapse;}th{background:#0C3547;color:#fff;padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;}
-  td{padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;}tr:nth-child(even) td{background:#F8FBFD;}
-  .btn{background:#0369A1;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:700;margin-top:18px;}
-  @media print{.btn{display:none;}}</style></head><body>
+  rows+=`<tr style="background:#F5FAFE;font-weight:700;"><td colspan="4">SUB TOTAL</td><td style="font-family:monospace;color:#DC2626;text-align:right;">₹${totalDr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;color:#059669;text-align:right;">₹${totalCr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td></td></tr>
+  <tr style="background:#0C3547;color:#fff;font-weight:800;"><td colspan="6">CLOSING BALANCE</td><td style="font-family:monospace;color:${cb<0?'#FCA5A5':cb>0?'#6EE7B7':'#fff'};text-align:right;">₹${Math.abs(cb).toLocaleString('en-IN',{minimumFractionDigits:2})} ${cb<0?'Dr':cb>0?'Cr':''}</td></tr>`;
+  return {html:`<!DOCTYPE html><html><head><title>Fleet Card Ledger</title>
+  <style>
+  ${compact?'@page{size:A4 landscape;margin:8mm;}':'@page{size:A4 portrait;margin:12mm;}'}
+  *{box-sizing:border-box;}
+  body{font-family:Arial,sans-serif;font-size:${fs};padding:${compact?'6px':'16px'};}
+  h1{font-size:${compact?'11px':'16px'};margin-bottom:2px;font-weight:800;}
+  .meta{color:#888;font-size:${compact?'7px':'10px'};margin-bottom:${compact?'5px':'10px'};}
+  .summary{display:flex;gap:6px;margin-bottom:${compact?'6px':'12px'};}
+  .sbox{background:#F5FAFE;border:1px solid #D1E4EE;border-radius:4px;padding:${compact?'4px 6px':'8px 12px'};flex:1;text-align:center;}
+  .sval{font-size:${compact?'9px':'13px'};font-weight:700;font-family:monospace;}
+  .slbl{font-size:${compact?'6px':'9px'};color:#888;text-transform:uppercase;margin-top:1px;}
+  table{width:100%;border-collapse:collapse;}
+  th{background:#0C3547;color:#fff;padding:${hpad};text-align:left;font-size:${compact?'7px':'9px'};text-transform:uppercase;letter-spacing:.3px;}
+  td{padding:${pad};border-bottom:1px solid #eee;font-size:${fs};white-space:nowrap;}
+  tr:nth-child(even) td{background:#F8FBFD;}
+  .no-print{background:#0369A1;color:#fff;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:700;margin:10px 4px 0;}
+  .no-print.sec{background:#059669;}
+  @media print{.no-print{display:none;}}
+  </style></head><body>
   <h1>⛽ FLEET CARD LEDGER · ${particularsLabel} · ${fyLabel(ledgerFY)}</h1>
-  <div class="meta">Period: ${fmtDate(from)} to ${fmtDate(to)} · Generated: ${new Date().toLocaleString('en-IN')}</div>
+  <div class="meta">Period: ${fmtDate(from)} to ${fmtDate(to)} · ${combined.length} entries · Generated: ${new Date().toLocaleString('en-IN')}</div>
   <div class="summary">
-    ${isFC?`<div class="sbox"><div class="sval" style="color:#0369A1;">₹${ob.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Opening Balance</div></div>`:''}
+    ${isFC?`<div class="sbox"><div class="sval" style="color:#0369A1;">₹${ob.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Opening Bal</div></div>`:''}
     <div class="sbox"><div class="sval" style="color:#DC2626;">₹${totalDr.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Debit</div></div>
     <div class="sbox"><div class="sval" style="color:#059669;">₹${totalCr.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Credit</div></div>
-    <div class="sbox"><div class="sval" style="color:${cb<0?'#DC2626':cb>0?'#059669':'#333'};">₹${Math.abs(cb).toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Closing Balance</div></div>
+    <div class="sbox"><div class="sval" style="color:${cb<0?'#DC2626':cb>0?'#059669':'#333'};">₹${Math.abs(cb).toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Closing Bal</div></div>
   </div>
-  <table><thead><tr><th>Date</th><th>Particulars</th><th>TID</th><th>Batch #</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead>
+  <table><thead><tr><th>Date</th><th>Particulars</th><th>TID</th><th>Batch#</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th style="text-align:right">Balance</th></tr></thead>
   <tbody>${rows}</tbody></table>
-  <button class="btn" onclick="window.print()">🖨 Print / Save PDF</button></body></html>`);
-  w.document.close();toast('PDF opened!');
+  <div class="no-print" style="margin-top:10px;">
+    <button class="no-print" onclick="window.print()">🖨 Print / Save PDF</button>
+    <button class="no-print sec" onclick="switchCompact()">⇄ Toggle Compact/Normal</button>
+  </div>
+  <script>
+    var _compact=${compact?'true':'false'};
+    function switchCompact(){
+      window.opener&&window.opener._ledgerPreview&&window.opener._ledgerPreview(_compact?false:true);
+      window.close();
+    }
+  <\/script>
+  </body></html>`, rows:combined.length};
+}
+
+function exportLedgerPDF(compact){
+  const result=buildLedgerHTML(!!compact);
+  if(!result){return;}
+  const w=window.open('','_blank');
+  if(!w){toast('Allow popups to preview PDF','err');return;}
+  window._ledgerPreview=function(c){
+    const r2=buildLedgerHTML(!!c);
+    const w2=window.open('','_blank');
+    if(w2){w2.document.write(r2.html);w2.document.close();}
+  };
+  w.document.write(result.html);w.document.close();
+  toast(compact?'Compact preview opened — more rows per page!':'Preview opened!');
 }
 
 // ── DELETE BY PERIOD ────────────────────────────────────────────────────────
