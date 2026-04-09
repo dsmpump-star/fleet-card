@@ -491,22 +491,36 @@ async function loadFromSheet(){
     } else {
       db.customers=remote.customers;
     }
-    // Reconcile: for any creditedMap entry, ensure a linked received record exists in db
-    // (Sheet may not store linkedTxnId field, so we match by txnId stored in creditedMap)
-    loadCreditedMap(); // reload in case updated elsewhere
-    const linkedIds=new Set(db.received.filter(r=>r.linkedTxnId).map(r=>r.linkedTxnId));
-    for(const txnId of Object.keys(creditedMap)){
-      if(!linkedIds.has(txnId)){
-        const txn=db.transactions.find(t=>t.id===txnId);
-        if(txn){
-          const v=creditedMap[txnId];
-          const entry={id:uid(),tid:txn.tid,customer:txn.customer,batch:txn.batch,date:txn.date,
-            amount:txn.amount,note:'Verified credit'+(v.note?' - '+v.note:''),
-            savedAt:v.creditedAt||new Date().toISOString(),linkedTxnId:txnId};
-          db.received.push(entry);
-        }
+    // Step 1: Attach linkedTxnId to received entries from sheet by matching tid+batch+date to transactions
+    db.received.forEach(r=>{
+      if(!r.linkedTxnId){
+        const match=db.transactions.find(t=>
+          String(t.tid).trim()===String(r.tid).trim()&&
+          String(t.batch)===String(r.batch)&&
+          t.date===r.date&&
+          Math.abs(t.amount-r.amount)<0.01
+        );
+        if(match)r.linkedTxnId=match.id;
       }
-    }
+    });
+    // Step 2: Deduplicate db.received — keep only one entry per linkedTxnId
+    // For entries with same linkedTxnId, keep the one from sheet (has real id), discard extras
+    const seenLinked=new Set();
+    db.received=db.received.filter(r=>{
+      if(!r.linkedTxnId)return true; // non-linked entries always kept
+      if(seenLinked.has(r.linkedTxnId))return false;
+      seenLinked.add(r.linkedTxnId);
+      return true;
+    });
+    // Step 3: Sync creditedMap from sheet — any received entry with note containing 'Verified credit'
+    // should be reflected in creditedMap so the Verify tab shows correct state
+    loadCreditedMap();
+    db.received.forEach(r=>{
+      if(r.linkedTxnId&&!creditedMap[r.linkedTxnId]){
+        creditedMap[r.linkedTxnId]={creditedAt:r.savedAt||new Date().toISOString(),note:''};
+      }
+    });
+    saveCreditedMap();
     saveLocal();
     setSyncStatus('ok');
     renderAll();
@@ -514,7 +528,14 @@ async function loadFromSheet(){
     setSyncStatus('err');
     toast('Offline — using local data','err');
     const local=localStorage.getItem('fleet2_db');
-    if(local)try{const ld=JSON.parse(local);Object.assign(db,ld);if(!db.fyOpeningBalances)db.fyOpeningBalances={};if(!db.activeFYs)db.activeFYs=[getCurrentFY()];}catch{}
+    if(local)try{
+      const ld=JSON.parse(local);Object.assign(db,ld);
+      if(!db.fyOpeningBalances)db.fyOpeningBalances={};
+      if(!db.activeFYs)db.activeFYs=[getCurrentFY()];
+      // Dedup received in local cache too
+      const seen=new Set();
+      db.received=db.received.filter(r=>{if(!r.linkedTxnId)return true;if(seen.has(r.linkedTxnId))return false;seen.add(r.linkedTxnId);return true;});
+    }catch{}
     renderAll();
   }
 }
@@ -831,15 +852,25 @@ async function markCredited(txnId){
   saveCreditedMap();
   refreshRecv(); // instant: entry disappears from Pending view right away
   toast('✅ Marked as Credited!');
-  // Background: create linked received entry in db + sync to sheet
+  // Background: create linked received entry in db + sync to sheet (only if none exists yet)
   const txn=db.transactions.find(t=>t.id===txnId);
-  if(txn&&!db.received.find(r=>r.linkedTxnId===txnId)){
-    const entry={id:uid(),tid:txn.tid,customer:txn.customer,batch:txn.batch,date:txn.date,
-      amount:txn.amount,note:'Verified credit'+(note?' - '+note:''),
-      savedAt:new Date().toISOString(),linkedTxnId:txnId};
-    db.received.push(entry);
-    saveLocal();
-    apiPost({action:'saveReceived',data:entry}).catch(()=>{}); // background, no sync flicker
+  if(txn){
+    // Check by linkedTxnId OR by matching tid+batch+date (for entries loaded from sheet without linkedTxnId)
+    const alreadyExists=db.received.find(r=>
+      r.linkedTxnId===txnId||
+      (String(r.tid).trim()===String(txn.tid).trim()&&String(r.batch)===String(txn.batch)&&r.date===txn.date&&Math.abs(r.amount-txn.amount)<0.01)
+    );
+    if(!alreadyExists){
+      const entry={id:uid(),tid:txn.tid,customer:txn.customer,batch:txn.batch,date:txn.date,
+        amount:txn.amount,note:'Verified credit'+(note?' - '+note:''),
+        savedAt:new Date().toISOString(),linkedTxnId:txnId};
+      db.received.push(entry);
+      saveLocal();
+      apiPost({action:'saveReceived',data:entry}).catch(()=>{});
+    } else {
+      // Attach linkedTxnId to existing entry if missing
+      if(!alreadyExists.linkedTxnId){alreadyExists.linkedTxnId=txnId;saveLocal();}
+    }
   }
 }
 
