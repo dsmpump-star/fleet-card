@@ -769,11 +769,12 @@ function refreshDSM(){
 }
 
 function txnHTML(t,showDel){
+  const ts=t.createdAt?new Date(t.createdAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true}):'';
   return`<div class="entry-item">
     <div class="entry-top">
       <div>
         <div class="e-main">${t.tid} · Batch #${t.batch}</div>
-        <div class="e-sub">👤 ${t.customer||'Fleet Card'} · 📅 ${fmtDate(t.date)}</div>
+        <div class="e-sub">👤 ${t.customer||'Fleet Card'} · 📅 ${fmtDate(t.date)}${ts?' · 🕐 '+ts:''}</div>
       </div>
       <div><div class="e-amt debit">${fmtAmt(t.amount)}</div><div class="e-meta">Debit</div></div>
     </div>
