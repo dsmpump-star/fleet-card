@@ -145,7 +145,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   </div>
   <div class="tabs">
     <div class="tab active" onclick="switchTab('dsm')">📥 DSM</div>
-    <div class="tab" onclick="switchTab('recv')">✅ Verify</div>
+    <div class="tab" onclick="switchTab('recv')">✅ Verify <span id="pending-badge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;font-size:9px;padding:1px 5px;margin-left:2px;font-weight:800;vertical-align:middle;"></span></div>
     <div class="tab" onclick="switchTab('report')">📊 Report</div>
     <div class="tab" onclick="switchTab('ledger')">📒 Ledger</div>
     <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
@@ -173,7 +173,12 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <label>Debit Amount (₹)</label>
       <div class="big-wrap"><span class="big-sym">₹</span><input type="number" id="dsm-amount" class="big-input" placeholder="0.00" min="0" step="0.01"></div>
     </div>
+    <div class="form-row"><label>Remark <span style="font-size:10px;color:var(--muted);font-weight:500;">(slip ref / vehicle no. / optional)</span></label><input type="text" id="dsm-remark" placeholder="e.g. Slip #4521, MH-12-AB-1234"></div>
     <button class="btn btn-primary" onclick="saveDSM()">＋ Save Debit Entry</button>
+  </div>
+  <div style="position:relative;margin-bottom:12px;">
+    <input type="text" id="dsm-search" placeholder="🔍 Search batch no., amount, customer, remark..." oninput="refreshDSM()" style="width:100%;padding:10px 13px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Sans',sans-serif;font-size:13px;background:#fff;outline:none;">
+    <span id="dsm-search-clear" onclick="document.getElementById('dsm-search').value='';refreshDSM();" style="display:none;position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--muted);font-size:16px;">✕</span>
   </div>
   <div class="sh"><div class="sh-title">Today's Entries</div><div class="sh-count" id="today-count"></div></div>
   <div id="dsm-today"></div>
@@ -349,6 +354,18 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <button class="btn btn-outline" onclick="testNotification()" id="notif-test-btn" style="display:none;">Test</button>
     </div>
     <button class="btn btn-outline" onclick="disableNotifications()" id="notif-disable-btn" style="display:none;margin-top:8px;border-color:#FECACA;color:var(--red);">Disable Notifications</button>
+  </div>
+
+  <!-- DAILY EXCEL CARD -->
+  <div class="card">
+    <div class="card-title">📊 Daily Excel Report</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:11px;">Auto-downloads today's entries as Excel at 12:00 PM if the app is open. Also shows a WhatsApp share button.</p>
+    <div id="daily-excel-status" style="font-size:12px;font-weight:600;margin-bottom:10px;padding:8px 12px;border-radius:8px;background:#F0F9FF;color:var(--blue);display:none;"></div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <button class="btn btn-green" onclick="enableDailyExcel()" id="daily-excel-enable-btn">📊 Enable Auto-Export at 12 PM</button>
+    </div>
+    <button class="btn btn-outline" onclick="disableDailyExcel()" id="daily-excel-disable-btn" style="display:none;margin-bottom:8px;border-color:#FECACA;color:var(--red);">Disable Auto-Export</button>
+    <button class="btn btn-accent" onclick="exportDailyExcel(false)" style="font-size:13px;">⬇ Download Today's Excel Now</button>
   </div>
 
   <!-- BACKUP & RESTORE CARD -->
@@ -625,7 +642,7 @@ function switchTab(tab){
     document.getElementById('led-to').value=todayStr();
     populateLedgerFilters();
   }
-  if(tab==='settings'){renderAll();updateNotifUI();updateBackupInfo();}
+  if(tab==='settings'){renderAll();updateNotifUI();updateBackupInfo();updateDailyExcelUI();}
 }
 
 // ── DROPDOWNS ─────────────────────────────────────────────────────────────
@@ -739,9 +756,31 @@ async function saveDSM(){
   if(!batch)return toast('Enter batch number','err');
   if(!date)return toast('Select a date','err');
   if(!amount||amount<=0)return toast('Enter a valid amount','err');
+  // Duplicate batch check for same TID
+  if(db.transactions.some(t=>t.tid===tid&&String(t.batch)===String(batch))){
+    if(!confirm(`⚠️ Batch #${batch} already exists for ${tid}. Are you sure this is not a duplicate?`))return;
+  }
+  // Missed batch check — warn if a batch number is skipped
+  {
+    const tidBatches=db.transactions.filter(t=>t.tid===tid).map(t=>Number(t.batch)).filter(Boolean).sort((a,b)=>a-b);
+    const newB=Number(batch);
+    if(tidBatches.length>0){
+      const maxB=Math.max(...tidBatches);
+      if(newB>maxB+1){
+        const missed=[];for(let i=maxB+1;i<newB;i++)missed.push(i);
+        if(missed.length<=5){
+          if(!confirm(`⚠️ Batch gap detected for ${tid}!
+Missed: #${missed.join(', #')}
+Last saved: #${maxB} → New: #${newB}
+Continue?`))return;
+        }
+      }
+    }
+  }
   // Warn if date outside active FY
   if(!inFY(date,activeFY)){const{from,to}=fyDates(activeFY);if(!confirm(`Date ${fmtDate(date)} is outside ${fyLabel(activeFY)} (${fmtDate(from)}–${fmtDate(to)}). Save anyway?`))return;}
-  const entry={id:uid(),tid,customer,batch,date,amount,createdAt:new Date().toISOString()};
+  const remark=document.getElementById('dsm-remark').value.trim();
+  const entry={id:uid(),tid,customer,batch,date,amount,remark,createdAt:new Date().toISOString()};
   db.transactions.push(entry);
   // ensure FY is tracked
   const entryFY=dateToFY(date);
@@ -749,14 +788,40 @@ async function saveDSM(){
   document.getElementById('dsm-amount').value='';
   document.getElementById('dsm-tid').value='';
   document.getElementById('dsm-batch').value='';
+  document.getElementById('dsm-remark').value='';
   toast(`Saved ✓  ${customer}  Batch #${batch}  ${fmtAmt(amount)}`);
   refreshDSM();saveLocal();
   {const r=await apiPost({action:'saveTransaction',data:entry});setSyncStatus(r.success?'ok':'err');}
 }
 
-function refreshDSM(){
+function refreshDSM(){updatePendingBadge();
   const today=todayStr();
+  const q=(document.getElementById('dsm-search')||{}).value||'';
+  const qL=q.trim().toLowerCase();
+  // show/hide clear button
+  const clr=document.getElementById('dsm-search-clear');
+  if(clr)clr.style.display=qL?'block':'none';
   const allT=fyTxns();
+  function matchSearch(t){
+    if(!qL)return true;
+    return String(t.batch).includes(qL)||
+      String(t.amount).includes(qL)||
+      (t.customer||'').toLowerCase().includes(qL)||
+      (t.tid||'').toLowerCase().includes(qL)||
+      (t.remark||'').toLowerCase().includes(qL)||
+      fmtDate(t.date).includes(qL);
+  }
+  if(qL){
+    // Search mode: show all matching across all dates, no grouping
+    const matched=allT.filter(matchSearch).reverse();
+    document.getElementById('today-count').textContent=`${matched.length} result${matched.length!==1?'s':'y'}`;
+    document.getElementById('dsm-today').innerHTML=matched.length
+      ?matched.map(t=>txnHTML(t,true)).join('')
+      :'<div class="empty"><div class="ico">🔍</div><p>No entries match</p></div>';
+    document.getElementById('recent-count').textContent='';
+    document.getElementById('dsm-recent').innerHTML='';
+    return;
+  }
   const todayT=allT.filter(t=>t.date===today).reverse();
   const recentT=allT.filter(t=>t.date!==today).reverse().slice(0,40);
   document.getElementById('today-count').textContent=`${todayT.length} entr${todayT.length!==1?'ies':'y'}`;
@@ -775,6 +840,7 @@ function txnHTML(t,showDel){
       <div>
         <div class="e-main">${t.tid} · Batch #${t.batch}</div>
         <div class="e-sub">👤 ${t.customer||'Fleet Card'} · 📅 ${fmtDate(t.date)}${ts?' · 🕐 '+ts:''}</div>
+        ${t.remark?`<div style="font-size:11px;color:var(--blue);margin-top:3px;font-weight:600;">📝 ${t.remark}</div>`:''}
       </div>
       <div><div class="e-amt debit">${fmtAmt(t.amount)}</div><div class="e-meta">Debit</div></div>
     </div>
@@ -798,6 +864,7 @@ function editTxn(id){
       <div><label>Date</label><input type="date" id="et-date" value="${t.date}"></div>
     </div>
     <div class="form-row"><label>Amount (₹)</label><input type="number" id="et-amount" value="${t.amount}" min="0" step="0.01"></div>
+    <div class="form-row"><label>Remark</label><input type="text" id="et-remark" value="${t.remark||''}" placeholder="Slip ref / vehicle no."></div>
     <div style="display:flex;gap:9px;">
       <button class="btn btn-primary" onclick="saveEditTxn('${id}')">✓ Save</button>
       <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
@@ -811,7 +878,8 @@ async function saveEditTxn(id){
   const amount=parseFloat(document.getElementById('et-amount').value);
   if(!tid||!batch||!date||!amount||amount<=0)return toast('Fill all fields','err');
   const i=db.transactions.findIndex(t=>t.id===id);
-  if(i>=0)db.transactions[i]={...db.transactions[i],tid,customer,batch,date,amount};
+  const remark2=document.getElementById('et-remark')?document.getElementById('et-remark').value.trim():'';
+  if(i>=0)db.transactions[i]={...db.transactions[i],tid,customer,batch,date,amount,remark:remark2};
   closeModal();refreshDSM();saveLocal();toast('Updated ✓');
   {const r=await apiPost({action:'updateTransaction',data:db.transactions[i>=0?i:0]});setSyncStatus(r.success?'ok':'err');}
 }
@@ -892,6 +960,15 @@ async function unmarkCredited(txnId){
   refreshRecv();
 }
 
+function updatePendingBadge(){
+  const allT=fyTxns();
+  const pending=allT.filter(t=>!creditedMap[t.id]).length;
+  const badge=document.getElementById('pending-badge');
+  if(!badge)return;
+  if(pending>0){badge.textContent=pending;badge.style.display='inline';}
+  else{badge.style.display='none';}
+}
+
 function refreshRecv(){
   const allT=fyTxns();
   const verifiedTxns=allT.filter(t=>creditedMap[t.id]);
@@ -919,6 +996,7 @@ function refreshRecv(){
     ?'<div class="ico">⏳</div><p>No verified entries yet</p>'
     :'<div class="ico">📋</div><p>No DSM entries in this FY</p>';
 
+  updatePendingBadge();
   document.getElementById('recv-list').innerHTML=showList.length?showList.map(t=>{
     const isVerified=!!creditedMap[t.id];
     const v=creditedMap[t.id]||{};
@@ -1130,6 +1208,70 @@ function generateLedger(){
   document.getElementById('ledger-output').style.display='block';
   document.getElementById('ledger-output').scrollIntoView({behavior:'smooth'});
   toast('Ledger generated ✓');
+}
+
+// ── DAILY EXCEL AUTO-EXPORT ────────────────────────────────────────────────
+let dailyExcelTimer=null;
+
+function exportDailyExcel(silent=false){
+  const today=todayStr();
+  const todayTxns=fyTxns().filter(t=>t.date===today);
+  const todayRecv=fyRecv().filter(r=>r.date===today);
+  if(!todayTxns.length&&!todayRecv.length){
+    if(!silent)toast('No entries today to export','err');
+    return;
+  }
+  const combined=[
+    ...todayTxns.map(t=>({...t,type:'debit'})),
+    ...todayRecv.map(r=>({...r,type:'credit'}))
+  ].sort((a,b)=>a.date.localeCompare(b.date));
+  const totalDr=todayTxns.reduce((s,t)=>s+t.amount,0);
+  const totalCr=todayRecv.reduce((s,r)=>s+r.amount,0);
+  const data=[['Date','Time','TID','Batch #','Particulars','Remark','Debit (₹)','Credit (₹)']];
+  combined.forEach(e=>{
+    const ts=e.createdAt?new Date(e.createdAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true}):'';
+    data.push([fmtDate(e.date),ts,e.tid||'—','#'+e.batch,e.customer||'Fleet Card',e.remark||'',e.type==='debit'?e.amount:'',e.type==='credit'?e.amount:'']);
+  });
+  data.push([]);
+  data.push(['TOTAL','','','','','',totalDr,totalCr]);
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[12,10,14,10,22,18,14,14].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb,ws,'Daily Report');
+  XLSX.writeFile(wb,`FleetCard_Daily_${today}.xlsx`);
+  if(!silent)toast('Daily Excel downloaded!');
+
+  // WhatsApp share summary
+  const lines=todayTxns.map(t=>`• Batch #${t.batch} · ${t.customer||'Fleet Card'} · ₹${t.amount.toLocaleString('en-IN',{minimumFractionDigits:2})}${t.remark?' ('+t.remark+')':''}`);
+  const msg=`⛽ Fleet Card Daily Report — ${fmtDate(today)}%0A`
+    +`Entries: ${todayTxns.length} · Total Debit: ₹${totalDr.toLocaleString('en-IN',{minimumFractionDigits:2})}%0A%0A`
+    +lines.map(l=>encodeURIComponent(l)).join('%0A');
+  // Show WhatsApp button in a toast-like banner
+  let banner=document.getElementById('wa-banner');
+  if(!banner){banner=document.createElement('div');banner.id='wa-banner';
+    banner.style.cssText='position:fixed;bottom:88px;left:13px;right:13px;background:#075E54;color:#fff;border-radius:12px;padding:12px 14px;z-index:998;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 20px rgba(0,0,0,.2);';
+    document.body.appendChild(banner);}
+  banner.innerHTML=`<div><div style="font-size:12px;font-weight:700;">📊 Daily Excel ready!</div><div style="font-size:10px;opacity:.8;">${todayTxns.length} entries · ₹${totalDr.toLocaleString('en-IN',{maximumFractionDigits:0})} debit</div></div>
+    <div style="display:flex;gap:7px;">
+      <a href="https://wa.me/?text=${msg}" target="_blank" style="background:#25D366;color:#fff;border:none;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;">📤 WhatsApp</a>
+      <button onclick="document.getElementById('wa-banner').style.display='none'" style="background:rgba(255,255,255,.2);border:none;color:#fff;padding:7px 10px;border-radius:8px;cursor:pointer;font-size:12px;">✕</button>
+    </div>`;
+  banner.style.display='flex';
+  setTimeout(()=>{if(banner)banner.style.display='none';},15000);
+}
+
+function scheduleDailyExcel(){
+  if(dailyExcelTimer){clearTimeout(dailyExcelTimer);dailyExcelTimer=null;}
+  if(localStorage.getItem('fleet_daily_excel')!=='true')return;
+  const now=new Date();
+  const fire=new Date();
+  fire.setHours(12,0,0,0);
+  if(fire<=now)fire.setDate(fire.getDate()+1);
+  const ms=fire-now;
+  dailyExcelTimer=setTimeout(()=>{
+    exportDailyExcel(true);
+    scheduleDailyExcel();
+  },ms);
 }
 
 // ── EXPORT EXCEL ───────────────────────────────────────────────────────────
@@ -1491,6 +1633,28 @@ function sendDailySummaryNotif(isTest=false){
   new Notification(title,{body,icon:'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛽</text></svg>'});
 }
 
+function enableDailyExcel(){
+  localStorage.setItem('fleet_daily_excel','true');
+  scheduleDailyExcel();
+  updateDailyExcelUI();
+  toast('Auto daily Excel enabled — fires at 12:00 PM');
+}
+function disableDailyExcel(){
+  localStorage.setItem('fleet_daily_excel','false');
+  if(dailyExcelTimer){clearTimeout(dailyExcelTimer);dailyExcelTimer=null;}
+  updateDailyExcelUI();
+  toast('Auto daily Excel disabled');
+}
+function updateDailyExcelUI(){
+  const on=localStorage.getItem('fleet_daily_excel')==='true';
+  const s=document.getElementById('daily-excel-status');
+  const eb=document.getElementById('daily-excel-enable-btn');
+  const db2=document.getElementById('daily-excel-disable-btn');
+  if(!s)return;
+  if(on){s.style.display='block';s.textContent='✅ Auto-export ON — will download at 12:00 PM daily';if(eb)eb.style.display='none';if(db2)db2.style.display='block';}
+  else{s.style.display='none';if(eb)eb.style.display='block';if(db2)db2.style.display='none';}
+}
+
 function scheduleNotification(){
   if(notifTimer){clearTimeout(notifTimer);notifTimer=null;}
   if(localStorage.getItem('fleet_notif_enabled')!=='true')return;
@@ -1606,6 +1770,7 @@ function maybeCloseModal(e){if(e.target===document.getElementById('modal'))close
 // ── INIT ───────────────────────────────────────────────────────────────────
 loadFromSheet();
 scheduleNotification();
+scheduleDailyExcel();
 // Auto-refresh every 3 min to keep sync status accurate
 setInterval(()=>{if(!document.hidden)loadFromSheet();},3*60*1000);
 
