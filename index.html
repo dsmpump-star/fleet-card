@@ -895,11 +895,20 @@ async function saveEditTxn(id){
 async function delTxn(id){
   if(!confirm('Delete this entry?'))return;
   db.transactions=db.transactions.filter(t=>t.id!==id);
-  // Also remove verification mark and linked received entry
+  // Also remove verification mark and linked received entry from Sheets
   if(creditedMap[id]){
+    const linkedRecv=db.received.find(r=>r.linkedTxnId===id);
     delete creditedMap[id];saveCreditedMap();
     db.received=db.received.filter(r=>r.linkedTxnId!==id);
+    // Delete linked received from Sheets too
+    if(linkedRecv){
+      apiPost({action:'deleteReceived',id:linkedRecv.id}).catch(()=>{});
+    }
   }
+  // Also delete any received entries matching this transaction id directly
+  const orphanRecv=db.received.filter(r=>r.id===id||r.linkedTxnId===id);
+  orphanRecv.forEach(r=>apiPost({action:'deleteReceived',id:r.id}).catch(()=>{}));
+  db.received=db.received.filter(r=>r.id!==id&&r.linkedTxnId!==id);
   refreshDSM();saveLocal();toast('Deleted','err');
   {const r=await apiPost({action:'deleteTransaction',id});setSyncStatus(r.success?'ok':'err');}
 }
