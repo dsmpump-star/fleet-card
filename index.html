@@ -153,6 +153,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
   </div>
   <div class="tabs">
+    <div class="tab" onclick="switchTab('dash')">🏠 Home</div>
     <div class="tab active" onclick="switchTab('dsm')">📥 DSM</div>
     <div class="tab" onclick="switchTab('recv')">✅ Verify <span id="pending-badge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;font-size:9px;padding:1px 5px;margin-left:2px;font-weight:800;vertical-align:middle;"></span></div>
     <div class="tab" onclick="switchTab('report')">📊 Report</div>
@@ -162,6 +163,41 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 </div>
 
 <!-- ═══ DSM ENTRY ═══ -->
+<!-- ═══ FLEET DASHBOARD ═══ -->
+<div class="page" id="page-dash">
+  <!-- Pending Hero -->
+  <div style="background:linear-gradient(135deg,#0C3547,#1a4a6b);border-radius:16px;padding:20px 18px;margin-bottom:13px;color:#fff;">
+    <div style="font-size:11px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">💳 Pending Verification</div>
+    <div id="fd-pending-amt" style="font-size:36px;font-weight:800;font-family:'Roboto Mono',monospace;color:#FCA5A5;line-height:1;">₹0</div>
+    <div id="fd-pending-sub" style="font-size:12px;color:rgba(255,255,255,.5);margin-top:4px;">0 unverified entries</div>
+  </div>
+  <!-- Stats Grid -->
+  <div class="tiles">
+    <div class="tile t-r"><div class="tile-val" id="fd-total-dr">₹0</div><div class="tile-lbl">Total Debit</div></div>
+    <div class="tile t-g"><div class="tile-val" id="fd-total-cr">₹0</div><div class="tile-lbl">Verified Credit</div></div>
+    <div class="tile t-b"><div class="tile-val" id="fd-ob">₹0</div><div class="tile-lbl">Opening Balance</div></div>
+    <div class="tile t-o"><div class="tile-val" id="fd-today">₹0</div><div class="tile-lbl">Today's Entries</div></div>
+  </div>
+  <!-- FY Banner -->
+  <div style="background:linear-gradient(135deg,#0C3547,#1a4a6b);border-radius:13px;padding:11px 15px;margin-bottom:13px;display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <div style="font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;margin-bottom:2px;">Financial Year</div>
+      <div id="fd-fy" style="font-size:14px;font-weight:800;color:var(--accent);font-family:'Roboto Mono',monospace;">FY 2026-27</div>
+    </div>
+    <button onclick="showFYSwitcher&&showFYSwitcher()" style="background:rgba(255,190,11,.2);border:1.5px solid rgba(255,190,11,.4);border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700;color:var(--accent);cursor:pointer;">🗓 Switch FY</button>
+  </div>
+  <!-- Pending Entries -->
+  <div style="background:var(--card);border-radius:13px;border:1px solid var(--border);overflow:hidden;margin-bottom:13px;">
+    <div style="background:#0C3547;color:#fff;padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">🔴 Unverified Entries</div>
+    <div id="fd-pending-list"><div class="empty"><div class="ico">✅</div><p>All verified!</p></div></div>
+  </div>
+  <!-- Quick Actions -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:13px;">
+    <button class="btn btn-primary" onclick="switchTab('dsm')" style="padding:14px;">📥 New Entry</button>
+    <button class="btn btn-accent" onclick="switchTab('recv')" style="padding:14px;">✅ Verify</button>
+  </div>
+</div>
+
 <div class="page active" id="page-dsm">
   <div class="fy-banner">
     <div class="fy-banner-left">
@@ -643,8 +679,9 @@ function showFYModal(){
 // ── TABS ───────────────────────────────────────────────────────────────────
 function switchTab(tab){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['dsm','recv','report','ledger','settings'][i]===tab));
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['dash','dsm','recv','report','ledger','settings'][i]===tab));
   document.getElementById('page-'+tab).classList.add('active');
+  if(tab==='dash'){refreshFleetDash();return;}
   if(tab==='report'){refreshReport();refreshOutstanding();}
   if(tab==='ledger'){
     document.getElementById('led-from').value=firstOfFY();
@@ -1792,6 +1829,43 @@ scheduleDailyExcel();
 // Auto-refresh every 3 min to keep sync status accurate
 setInterval(()=>{if(!document.hidden)loadFromSheet();},3*60*1000);
 
+
+
+// ── FLEET DASHBOARD ──────────────────────────────────────────────────────────
+function refreshFleetDash(){
+  const allT=fyTxns();
+  const verifiedT=allT.filter(t=>creditedMap[t.id]);
+  const pendingT=allT.filter(t=>!creditedMap[t.id]);
+  const totalDr=allT.reduce((s,t)=>s+t.amount,0);
+  const totalCr=verifiedT.reduce((s,t)=>s+t.amount,0);
+  const pendingAmt=pendingT.reduce((s,t)=>s+t.amount,0);
+  const ob=getOB();
+  const today=todayStr();
+  const todayAmt=allT.filter(t=>t.date===today).reduce((s,t)=>s+t.amount,0);
+
+  document.getElementById('fd-pending-amt').textContent=fmtAmt(pendingAmt);
+  document.getElementById('fd-pending-sub').textContent=`${pendingT.length} unverified entr${pendingT.length!==1?'ies':'y'}`;
+  document.getElementById('fd-total-dr').textContent=fmtAmt(totalDr);
+  document.getElementById('fd-total-cr').textContent=fmtAmt(totalCr);
+  document.getElementById('fd-ob').textContent=fmtAmt(ob);
+  document.getElementById('fd-today').textContent=fmtAmt(todayAmt);
+  document.getElementById('fd-fy').textContent='FY '+activeFY.slice(0,2)+'-'+activeFY.slice(2);
+
+  const pl=document.getElementById('fd-pending-list');
+  if(!pendingT.length){
+    pl.innerHTML='<div class="empty" style="padding:20px;"><div class="ico">✅</div><p>All entries verified!</p></div>';
+    return;
+  }
+  const sorted=[...pendingT].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10);
+  pl.innerHTML=sorted.map(t=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:1px solid var(--border);">
+      <div>
+        <div style="font-size:13px;font-weight:700;">${t.customer||'Fleet Card'} · ${t.tid||''}</div>
+        <div style="font-size:11px;color:var(--muted);">Batch #${t.batch} · ${fmtDate(t.date)}</div>
+      </div>
+      <div style="font-size:14px;font-weight:700;font-family:'Roboto Mono',monospace;color:var(--red);">${fmtAmt(t.amount)}</div>
+    </div>`).join('');
+}
 
 // ── PWA ──────────────────────────────────────────────────────────────────────
 if('serviceWorker' in navigator){
