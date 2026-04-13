@@ -209,7 +209,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <div class="card">
     <div class="card-title">📲 New Debit Entry</div>
     <div class="form-row"><label>Select TID *</label><select id="dsm-tid" onchange="onDsmTIDChange()"><option value="">— Choose TID —</option></select></div>
-    <div class="form-row"><label>Customer / Particulars</label><select id="dsm-cust"></select></div>
+    <div class="form-row"><label>Customer / Particulars</label><select id="dsm-cust" onchange="onCustChange()"></select></div>
     <div class="form-row-2">
       <div><label>Batch No. <span style="font-size:10px;color:var(--green);font-weight:600;">(auto-filled)</span></label><input type="number" id="dsm-batch" placeholder="Auto from TID" min="1" style="background:#F0F9FF;border-color:#BAE6FD;"></div>
       <div><label>Date</label><input type="date" id="dsm-date"></div>
@@ -218,7 +218,14 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <label>Debit Amount (₹)</label>
       <div class="big-wrap"><span class="big-sym">₹</span><input type="number" id="dsm-amount" class="big-input" placeholder="0.00" min="0" step="0.01"></div>
     </div>
-    <div class="form-row"><label>Remark <span style="font-size:10px;color:var(--muted);font-weight:500;">(slip ref / vehicle no. / optional)</span></label><input type="text" id="dsm-remark" placeholder="e.g. Slip #4521, MH-12-AB-1234"></div>
+    <div class="form-row" id="stno-row" style="display:none;">
+      <label>STNO: Statement No <span style="color:var(--red);font-size:12px;">*</span> <span style="font-size:10px;color:var(--muted);">Required for customer entries (max 4 digits)</span></label>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-weight:700;color:var(--muted);font-size:13px;">STNO:</span>
+        <input type="number" id="dsm-stno" placeholder="e.g. 1234" min="1" max="9999" style="flex:1;">
+      </div>
+    </div>
+    <div class="form-row"><label>Remark <span style="font-size:10px;color:var(--muted);font-weight:500;">(slip ref / vehicle no. / optional)</span></label><input type="text" id="dsm-remark" placeholder="e.g. MH-12-AB-1234"></div>
     <button class="btn btn-primary" onclick="saveDSM()">＋ Save Debit Entry</button>
   </div>
   <div style="position:relative;margin-bottom:12px;">
@@ -314,7 +321,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div><label>TID</label><select id="led-tid"><option value="ALL">All TIDs</option></select></div>
       <div><label>Particulars</label><select id="led-cust"><option value="ALL">All (Fleet Card + Customers)</option><option value="Fleet Card">Fleet Card Only</option><option value="ALL_CUSTOMERS">All Customers (Combined)</option></select></div>
     </div>
-    <button class="btn btn-primary" onclick="generateLedger()">📒 Generate Ledger</button>
+    <button class="btn btn-primary" onclick="generateLedger()" style="width:100%;margin-bottom:6px;">📒 Generate Ledger</button>
+    <button class="btn" onclick="generateFleetMonthSummary()" style="width:100%;margin-bottom:6px;background:#10B981;color:#fff;">📅 Month-wise Summary</button>
+    <button class="btn" onclick="exportFleetExcel(document.getElementById('led-from').value,document.getElementById('led-to').value)" style="width:100%;background:#1D6F42;color:#fff;">📊 Export Excel (.xlsx)</button>
   </div>
   <div id="ledger-output" style="display:none;">
     <div class="bal-banner">
@@ -792,9 +801,31 @@ function onDsmTIDChange(){
   }
 }
 
+
+function onCustChange(){
+  const cust=document.getElementById('dsm-cust').value;
+  const stnoRow=document.getElementById('stno-row');
+  const stnoInput=document.getElementById('dsm-stno');
+  if(cust&&cust!=='Fleet Card'){
+    stnoRow.style.display='block';
+    stnoInput.required=true;
+  } else {
+    stnoRow.style.display='none';
+    stnoInput.required=false;
+    stnoInput.value='';
+  }
+}
+
 async function saveDSM(){
   const tid=document.getElementById('dsm-tid').value.trim();
   const customer=document.getElementById('dsm-cust').value||'Fleet Card';
+  // Validate STNO for customer entries
+  const stnoVal=document.getElementById('dsm-stno').value.trim();
+  if(customer!=='Fleet Card'){
+    if(!stnoVal) return toast('Statement No (STNO) is required for customer entries','err');
+    if(!/^\d{1,4}$/.test(stnoVal)) return toast('STNO must be 1-4 digits only','err');
+  }
+  const stnoPrefix=customer!=='Fleet Card'?'STNO: '+stnoVal+' — ':'';
   const batch=document.getElementById('dsm-batch').value.trim();
   const date=document.getElementById('dsm-date').value;
   const amount=parseFloat(document.getElementById('dsm-amount').value);
@@ -825,7 +856,7 @@ Continue?`))return;
   }
   // Warn if date outside active FY
   if(!inFY(date,activeFY)){const{from,to}=fyDates(activeFY);if(!confirm(`Date ${fmtDate(date)} is outside ${fyLabel(activeFY)} (${fmtDate(from)}–${fmtDate(to)}). Save anyway?`))return;}
-  const remark=document.getElementById('dsm-remark').value.trim();
+  const remark=stnoPrefix+(document.getElementById('dsm-remark').value.trim());
   const entry={id:uid(),tid,customer,batch,date,amount,remark,createdAt:new Date().toISOString()};
   db.transactions.push(entry);
   // ensure FY is tracked
@@ -835,6 +866,8 @@ Continue?`))return;
   document.getElementById('dsm-tid').value='';
   document.getElementById('dsm-batch').value='';
   document.getElementById('dsm-remark').value='';
+  document.getElementById('dsm-stno').value='';
+  onCustChange();
   toast(`Saved ✓  ${customer}  Batch #${batch}  ${fmtAmt(amount)}`);
   refreshDSM();saveLocal();
   {const r=await apiPost({action:'saveTransaction',data:entry});setSyncStatus(r.success?'ok':'err');}
@@ -1390,17 +1423,17 @@ function exportPDF(){
     rows+=`<tr><td>${fmtDate(e.date)}</td><td>${e.tid||'—'}</td><td>#${e.batch}</td><td>${e.customer||'Fleet Card'}</td><td style="color:#DC2626;font-family:monospace;font-weight:700;">${isD?'₹'+e.amount.toLocaleString('en-IN',{minimumFractionDigits:2}):''}</td><td style="color:#059669;font-family:monospace;font-weight:700;">${!isD?'₹'+e.amount.toLocaleString('en-IN',{minimumFractionDigits:2}):''}</td></tr>`;
   });
   const particularsLabel=custFilter==='ALL'?'All':custFilter==='ALL_CUSTOMERS'?'All Customers':custFilter;
-  const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><title>Fleet Card Report</title>
+  const _frHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fleet Card Report</title>
   <style>body{font-family:Arial,sans-serif;font-size:12px;padding:24px;}h1{font-size:18px;margin-bottom:4px;}
-  .meta{color:#888;font-size:11px;margin-bottom:14px;}.summary{display:flex;gap:10px;margin-bottom:16px;}
-  .sbox{background:#F5FAFE;border:1px solid #D1E4EE;border-radius:8px;padding:10px 14px;flex:1;}
+  .meta{color:#888;font-size:11px;margin-bottom:14px;}.summary{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+  .sbox{background:#F5FAFE;border:1px solid #D1E4EE;border-radius:8px;padding:10px 14px;flex:1;min-width:80px;}
   .sval{font-size:15px;font-weight:700;font-family:monospace;}.slbl{font-size:10px;color:#888;text-transform:uppercase;margin-top:2px;}
   table{width:100%;border-collapse:collapse;}th{background:#0C3547;color:#fff;padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;}
   td{padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;}tr:nth-child(even) td{background:#F8FBFD;}
   tfoot td{background:#164E63!important;color:#fff!important;font-weight:700;}
-  .btn{background:#0369A1;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:700;margin-top:18px;}
-  @media print{.btn{display:none;}}</style></head><body>
+  .btn{background:#0369A1;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:700;margin:8px 8px 8px 0;}
+  .btn-back{background:#6B7280!important;}.btn-wrap{margin-bottom:16px;}@media print{.btn-wrap{display:none;}}</style></head><body>
+  <div class="btn-wrap"><button class="btn btn-back" onclick="window.close()">← Back to App</button><button class="btn" onclick="window.print()">🖨 Print / Save PDF</button></div>
   <h1>⛽ FLEET CARD REPORT — ${particularsLabel} · ${fyLabel(activeFY)}</h1>
   <div class="meta">Generated: ${new Date().toLocaleString('en-IN')}</div>
   <div class="summary">
@@ -1412,8 +1445,9 @@ function exportPDF(){
   <table><thead><tr><th>Date</th><th>TID</th><th>Batch #</th><th>Particulars</th><th>Debit</th><th>Credit</th></tr></thead>
   <tbody>${rows}</tbody>
   <tfoot><tr><td colspan="4">TOTAL</td><td style="font-family:monospace;">₹${totalDr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;">₹${totalCr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr></tfoot></table>
-  <button class="btn" onclick="window.print()">🖨 Print / Save PDF</button></body></html>`);
-  w.document.close();toast('PDF opened!');
+  </body></html>`;
+  window.open(URL.createObjectURL(new Blob([_frHtml],{type:'text/html;charset=utf-8'})),'_blank');
+  toast('Report opened — use ← Back to return');
 }
 
 function buildLedgerHTML(compact){
@@ -1445,7 +1479,7 @@ function buildLedgerHTML(compact){
   });
   rows+=`<tr style="background:#F5FAFE;font-weight:700;"><td colspan="4">SUB TOTAL</td><td style="font-family:monospace;color:#DC2626;text-align:right;">₹${totalDr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;color:#059669;text-align:right;">₹${totalCr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td></td></tr>
   <tr style="background:#0C3547;color:#fff;font-weight:800;"><td colspan="6">CLOSING BALANCE</td><td style="font-family:monospace;color:${cb<0?'#FCA5A5':cb>0?'#6EE7B7':'#fff'};text-align:right;">₹${Math.abs(cb).toLocaleString('en-IN',{minimumFractionDigits:2})} ${cb<0?'Dr':cb>0?'Cr':''}</td></tr>`;
-  return {html:`<!DOCTYPE html><html><head><title>Fleet Card Ledger</title>
+  return {html:`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fleet Card Ledger</title>
   <style>
   ${compact?'@page{size:A4 landscape;margin:8mm;}':'@page{size:A4 portrait;margin:12mm;}'}
   *{box-sizing:border-box;}
@@ -1491,15 +1525,14 @@ function buildLedgerHTML(compact){
 function exportLedgerPDF(compact){
   const result=buildLedgerHTML(!!compact);
   if(!result){return;}
-  const w=window.open('','_blank');
-  if(!w){toast('Allow popups to preview PDF','err');return;}
-  window._ledgerPreview=function(c){
-    const r2=buildLedgerHTML(!!c);
-    const w2=window.open('','_blank');
-    if(w2){w2.document.write(r2.html);w2.document.close();}
-  };
-  w.document.write(result.html);w.document.close();
-  toast(compact?'Compact preview opened — more rows per page!':'Preview opened!');
+  // Add back button to ledger HTML
+  const htmlWithBack=result.html.replace(
+    '<body>',
+    '<body><div style="margin-bottom:14px;padding:12px 0;"><button onclick="window.close()" style="background:#6B7280;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:700;margin-right:8px;">← Back to App</button><button onclick="window.print()" style="background:#0C3547;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:700;">🖨 Print / Save PDF</button></div>'
+  );
+  const blob=new Blob([htmlWithBack],{type:'text/html;charset=utf-8'});
+  window.open(URL.createObjectURL(blob),'_blank');
+  toast(compact?'Compact preview opened!':'Ledger opened — use ← Back to return');
 }
 
 // ── DELETE BY PERIOD ────────────────────────────────────────────────────────
@@ -1867,6 +1900,85 @@ function refreshFleetDash(){
     </div>`).join('');
 }
 
+
+// ── PULL TO REFRESH ──────────────────────────────────────────────────────────
+let _fPtrStart=0,_fPtrActive=false;
+document.addEventListener('touchstart',e=>{if(window.scrollY===0)_fPtrStart=e.touches[0].clientY;},{passive:true});
+document.addEventListener('touchend',e=>{
+  const dy=e.changedTouches[0].clientY-_fPtrStart;
+  if(dy>80&&window.scrollY===0&&!_fPtrActive){
+    _fPtrActive=true;
+    toast('↓ Syncing...');
+    loadFromSheet().finally(()=>{_fPtrActive=false;});
+  }
+  _fPtrStart=0;
+},{passive:true});
+
+// ── FLEET MONTH SUMMARY ───────────────────────────────────────────────────────
+function generateFleetMonthSummary(){
+  const txns=fyTxns();
+  const months={};
+  txns.forEach(t=>{
+    const mo=t.date.slice(0,7);
+    if(!months[mo])months[mo]={total:0,verified:0,pending:0,count:0};
+    months[mo].total+=t.amount;months[mo].count++;
+    if(creditedMap[t.id])months[mo].verified+=t.amount;
+    else months[mo].pending+=t.amount;
+  });
+  const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const rows=Object.keys(months).sort().map(mo=>{
+    const d=months[mo];const[y,m2]=mo.split('-');
+    return`<tr><td><strong>${monthNames[parseInt(m2)-1]} ${y}</strong></td>
+    <td style="font-family:monospace;color:#0C3547;">₹${d.total.toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+    <td style="font-family:monospace;color:#10B981;">₹${d.verified.toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+    <td style="font-family:monospace;color:#EF4444;">₹${d.pending.toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+    <td>${d.count}</td></tr>`;
+  }).join('');
+  const totDr=txns.reduce((s,t)=>s+t.amount,0);
+  const totCr=fyTxns().filter(t=>creditedMap[t.id]).reduce((s,t)=>s+t.amount,0);
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fleet Month Summary</title>
+  <style>body{font-family:Arial;font-size:12px;padding:20px;}table{width:100%;border-collapse:collapse;}
+  th{background:#0C3547;color:#fff;padding:8px;}td{padding:8px;border-bottom:1px solid #ddd;}
+  .btn{background:#6B7280;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:700;margin-right:8px;}
+  @media print{.btn{display:none;}}</style></head><body>
+  <div style="margin-bottom:14px;"><button class="btn" onclick="window.close()">← Back</button><button class="btn" style="background:#0C3547;" onclick="window.print()">🖨 Print</button></div>
+  <h2>🚛 Fleet Card — Month Summary (FY ${activeFY})</h2>
+  <table><thead><tr><th>Month</th><th>Total Debit</th><th>Verified</th><th>Pending</th><th>Entries</th></tr></thead>
+  <tbody>${rows}</tbody>
+  <tfoot style="background:#0C3547;color:#fff;"><tr><td>TOTAL</td><td>₹${totDr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td>₹${totCr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td>₹${(totDr-totCr).toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td>${txns.length}</td></tr></tfoot>
+  </table></body></html>`;
+  const _mw=window.open('','_blank');if(_mw){_mw.document.write(html);_mw.document.close();}
+  toast('Month summary opened');
+}
+
+// ── FLEET EXCEL EXPORT ────────────────────────────────────────────────────────
+async function exportFleetExcel(from,to){
+  if(typeof XLSX==='undefined'){
+    await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+  }
+  const txns=db.transactions.filter(t=>(!from||t.date>=from)&&(!to||t.date<=to)).sort((a,b)=>a.date.localeCompare(b.date));
+  const recv=db.received.filter(r=>(!from||r.date>=from)&&(!to||r.date<=to));
+  const ob=getOB();
+  const rows=[['Date','TID','Customer','Batch','Amount','Verified','Verified At']];
+  txns.forEach(t=>rows.push([t.date,t.tid,t.customer,t.batch,t.amount,creditedMap[t.id]?'Yes':'No',creditedMap[t.id]?.creditedAt||'']));
+  const rRows=[['Date','Amount','Note','Saved At']];
+  recv.forEach(r=>rRows.push([r.date,r.amount,r.note||'',r.savedAt||'']));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Transactions');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rRows),'Received');
+  XLSX.writeFile(wb,`Fleet_${from||'all'}_to_${to||'all'}.xlsx`);
+  toast('Excel downloaded ✅');
+}
+
+// ── FLEET NOTIFICATIONS ───────────────────────────────────────────────────────
+function requestFleetNotif(){
+  if('Notification' in window&&Notification.permission==='default')
+    Notification.requestPermission().then(p=>{if(p==='granted')toast('Notifications enabled ✅');});
+}
+function sendFleetNotif(title,body){
+  if(Notification.permission==='granted')
+    new Notification(title,{body,icon:'/fleet-card/fleet-icon-192.png',tag:'fleet-entry'});
+}
 // ── PWA ──────────────────────────────────────────────────────────────────────
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
