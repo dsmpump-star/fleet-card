@@ -1888,7 +1888,7 @@ function setNotifToggle(enabled){
     if(icon) icon.textContent='🔕';
     if(btn) btn.style.background='#1A2E3D';
   }
-  localStorage.setItem('fleet_notif_enabled', enabled?'1':'0');
+  // NOTE: do NOT write localStorage here — state is managed by toggleNotifications() only
 }
 
 async function toggleNotifications(){
@@ -1949,7 +1949,7 @@ function checkNotifBanner(){
   }
 }
 
-async function initFirebase(){
+async function initFirebase(swReg){
   try{
     if(!firebase.apps.length){
       _fbApp=firebase.initializeApp(FIREBASE_CONFIG);
@@ -1961,7 +1961,7 @@ async function initFirebase(){
       const permission=await Notification.requestPermission();
       if(permission!=='granted') return;
     }
-    const swReg=await navigator.serviceWorker.getRegistration();
+    if(!swReg) swReg=await navigator.serviceWorker.getRegistration();
     if(!swReg){ toast('SW not found — try reinstalling app','err'); return; }
     _fcmToken=await _fbMessaging.getToken({vapidKey:VAPID_KEY,serviceWorkerRegistration:swReg});
     if(_fcmToken){
@@ -2017,13 +2017,12 @@ async function sendPushNotification(title,body){
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('fleet-firebase-messaging-sw.js?v=3')
-      .then(r=>{
+      .then(swReg=>{
         console.log('Fleet SW registered');
         checkNotifBanner(); // set toggle immediately from localStorage
         const wasEnabled=localStorage.getItem('fleet_notif_enabled')==='1';
         if(wasEnabled){
-          // Silently re-acquire FCM token in background so push notifications work
-          initFirebase().catch(e=>console.log('FCM re-init:', e));
+          initFirebase(swReg).catch(e=>console.log('FCM re-init:', e));
         }
       })
       .catch(e=>console.log('Fleet SW error:',e));
