@@ -697,7 +697,7 @@ function switchTab(tab){
     document.getElementById('led-to').value=todayStr();
     populateLedgerFilters();
   }
-  if(tab==='settings'){renderAll();updateNotifUI();updateBackupInfo();updateDailyExcelUI();}
+  if(tab==='settings'){renderAll();updateBackupInfo();updateDailyExcelUI();}
 }
 
 // ── DROPDOWNS ─────────────────────────────────────────────────────────────
@@ -1738,7 +1738,6 @@ function maybeCloseModal(e){if(e.target===document.getElementById('modal'))close
 
 // ── INIT ───────────────────────────────────────────────────────────────────
 loadFromSheet();
-scheduleNotification();
 scheduleDailyExcel();
 // Auto-refresh every 3 min to keep sync status accurate
 setInterval(()=>{if(!document.hidden)loadFromSheet();},3*60*1000);
