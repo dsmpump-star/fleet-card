@@ -2110,8 +2110,13 @@ async function initFirebase(){
       toast('No token returned — check Firebase setup','err');
     }
     _fbMessaging.onMessage(payload=>{
-      const {title,body}=payload.notification||{};
-      toast((title||'Fleet Entry')+': '+(body||''));
+      // App is open — SW won't fire, show one native notification here
+      const {title,body,icon}=payload.data||{};
+      if(Notification.permission==='granted'){
+        navigator.serviceWorker.getRegistration().then(reg=>{
+          if(reg) reg.showNotification(title||'Fleet Entry Checker',{body:body||'',icon:icon||'fleet-icon-192.png',badge:'fleet-icon-192.png',tag:'fleet-fg'});
+        });
+      }
     });
   }catch(err){
     console.error('Firebase init error:', err);

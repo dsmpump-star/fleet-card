@@ -16,7 +16,7 @@ const messaging = firebase.messaging();
 // Handle background messages (when app is closed/minimized)
 messaging.onBackgroundMessage(payload => {
   console.log('[FCM] Fleet Background message:', payload);
-  const { title, body, icon } = payload.notification || {};
+  const { title, body, icon, link } = payload.data || {};
   self.registration.showNotification(title || 'Fleet Entry Checker', {
     body: body || 'New entry saved',
     icon: icon || '/fleet-card/fleet-icon-192.png',
