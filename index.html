@@ -1944,8 +1944,9 @@ async function initFirebase(){
       const p=await Notification.requestPermission();
       if(p!=='granted') return;
     }
-    const swReg=await navigator.serviceWorker.getRegistration();
-    if(!swReg){ toast('SW not found — reinstall app','err'); return; }
+    // Wait for SW to be fully active before getting FCM token
+    const swReg=await navigator.serviceWorker.ready;
+    if(!swReg){ toast('SW not ready — reinstall app','err'); return; }
     _fcmToken=await _fbMessaging.getToken({vapidKey:VAPID_KEY,serviceWorkerRegistration:swReg});
     if(_fcmToken){
       console.log('Fleet FCM token:',_fcmToken.slice(0,20)+'...');
@@ -1988,7 +1989,7 @@ checkNotifBanner();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('fleet-firebase-messaging-sw.js?v=4')
+    navigator.serviceWorker.register('fleet-firebase-messaging-sw.js')
       .then(()=>{
         console.log('Fleet SW registered');
         checkNotifBanner(); // re-check after SW ready
