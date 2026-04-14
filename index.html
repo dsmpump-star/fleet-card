@@ -2012,7 +2012,7 @@ async function sendPushNotification(title,body){
 // ── PWA ──────────────────────────────────────────────────────────────────────
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('fleet-firebase-messaging-sw.js')
+    navigator.serviceWorker.register('fleet-firebase-messaging-sw.js?v=3')
       .then(r=>{
         console.log('Fleet SW registered');
         const wasEnabled=localStorage.getItem('fleet_notif_enabled')==='1';
