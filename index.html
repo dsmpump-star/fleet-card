@@ -1925,6 +1925,7 @@ async function toggleNotifications(){
       }
       await initFirebase();
       if(_fcmToken){
+        localStorage.setItem('fleet_notif_enabled','1');
         setNotifToggle(true);
         toast('Notifications enabled 🔔');
       } else {
