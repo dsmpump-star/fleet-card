@@ -27,7 +27,7 @@ messaging.onBackgroundMessage(payload => {
 });
 
 // PWA cache logic
-const CACHE_NAME = 'fleet-epos-v3';
+const CACHE_NAME = 'fleet-epos-v4';
 const ASSETS = [
   '/fleet-card/index.html',
   '/fleet-card/fleet-manifest.json',

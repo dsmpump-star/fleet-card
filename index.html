@@ -1884,11 +1884,10 @@ function setNotifToggle(enabled){
   } else {
     if(toggle) toggle.style.background='#374151';
     if(knob) knob.style.left='2px';
-    if(txt) txt.textContent='Notifications Disabled — tap to enable';
+    if(txt) txt.textContent='Tap to Enable Notifications';
     if(icon) icon.textContent='🔕';
     if(btn) btn.style.background='#1A2E3D';
   }
-  // NOTE: do NOT write localStorage here — state is managed by toggleNotifications() only
 }
 
 async function toggleNotifications(){
@@ -1896,33 +1895,20 @@ async function toggleNotifications(){
   const txt=document.getElementById('notif-btn-text');
   if(isEnabled){
     try{
-      // Use stored token if in-memory token not yet re-acquired
-      const tokenToUnregister=_fcmToken||localStorage.getItem('fleet_fcm_token');
-      if(tokenToUnregister){
-        await fetch(FCM_UNREGISTER_URL,{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({token:tokenToUnregister,app:FCM_APP_ID})
-        });
-      }
+      const tok=_fcmToken||localStorage.getItem('fleet_fcm_token');
+      if(tok) await fetch(FCM_UNREGISTER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:tok,app:FCM_APP_ID})});
     }catch(e){}
     _fcmToken=null;
-    localStorage.removeItem('fleet_fcm_token');
     localStorage.setItem('fleet_notif_enabled','0');
+    localStorage.removeItem('fleet_fcm_token');
     setNotifToggle(false);
     toast('Notifications disabled 🔕');
   } else {
     if(txt) txt.textContent='⏳ Enabling...';
     try{
-      if(typeof Notification==='undefined'){
-        if(txt) txt.textContent='❌ Not supported on this browser';
-        return;
-      }
+      if(typeof Notification==='undefined'){ if(txt) txt.textContent='❌ Not supported'; return; }
       const perm=await Notification.requestPermission();
-      if(perm!=='granted'){
-        if(txt) txt.textContent='❌ Permission denied — check settings';
-        return;
-      }
+      if(perm!=='granted'){ if(txt) txt.textContent='❌ Permission denied — check settings'; return; }
       await initFirebase();
       if(_fcmToken){
         localStorage.setItem('fleet_notif_enabled','1');
@@ -1945,35 +1931,29 @@ function checkNotifBanner(){
     if(txt) txt.textContent='❌ Blocked — enable in Settings > Notifications';
     setNotifToggle(false);
   } else {
-    // Show toggle based on localStorage only — token re-acquired silently in background
     setNotifToggle(enabled);
   }
 }
 
-async function initFirebase(swReg){
+async function initFirebase(){
   try{
-    if(!firebase.apps.length){
-      _fbApp=firebase.initializeApp(FIREBASE_CONFIG);
-    } else {
-      _fbApp=firebase.app();
-    }
+    if(!firebase.apps.length){ _fbApp=firebase.initializeApp(FIREBASE_CONFIG); }
+    else { _fbApp=firebase.app(); }
     _fbMessaging=firebase.messaging();
     if(Notification.permission!=='granted'){
-      const permission=await Notification.requestPermission();
-      if(permission!=='granted') return;
+      const p=await Notification.requestPermission();
+      if(p!=='granted') return;
     }
-    if(!swReg) swReg=await navigator.serviceWorker.getRegistration();
-    if(!swReg){ toast('SW not found — try reinstalling app','err'); return; }
+    const swReg=await navigator.serviceWorker.getRegistration();
+    if(!swReg){ toast('SW not found — reinstall app','err'); return; }
     _fcmToken=await _fbMessaging.getToken({vapidKey:VAPID_KEY,serviceWorkerRegistration:swReg});
     if(_fcmToken){
-      console.log('FCM token obtained:', _fcmToken.slice(0,20)+'...');
+      console.log('Fleet FCM token:',_fcmToken.slice(0,20)+'...');
       await registerFCMToken(_fcmToken);
-      setNotifToggle(true);
     } else {
-      toast('No token returned — check Firebase setup','err');
+      toast('No FCM token — check Firebase setup','err');
     }
     _fbMessaging.onMessage(payload=>{
-      // App is open — SW won't fire, show one native notification here
       const {title,body,icon}=payload.data||{};
       if(Notification.permission==='granted'){
         navigator.serviceWorker.getRegistration().then(reg=>{
@@ -1982,7 +1962,7 @@ async function initFirebase(swReg){
       }
     });
   }catch(err){
-    console.error('Firebase init error:', err);
+    console.error('Fleet Firebase error:',err);
     toast('Firebase error: '+err.message,'err');
     throw err;
   }
@@ -1991,39 +1971,26 @@ async function initFirebase(swReg){
 async function registerFCMToken(token){
   try{
     const device=navigator.userAgent.includes('iPhone')?'iPhone':navigator.userAgent.includes('Android')?'Android':'Desktop';
-    await fetch(FCM_REGISTER_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({token,device,app:FCM_APP_ID})
-    });
+    await fetch(FCM_REGISTER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,device,app:FCM_APP_ID})});
     localStorage.setItem('fleet_fcm_token',token);
-  }catch(err){
-    console.error('Token registration error:', err);
-  }
+  }catch(e){ console.error('Fleet token reg error:',e); }
 }
 
 async function sendPushNotification(title,body){
   try{
-    await fetch(FCM_NOTIFY_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({title,body,app:FCM_APP_ID})
-    });
-  }catch(err){
-    console.error('Push notification error:', err);
-  }
+    await fetch(FCM_NOTIFY_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,body,app:FCM_APP_ID})});
+  }catch(e){ console.error('Fleet push error:',e); }
 }
 
 // ── PWA ──────────────────────────────────────────────────────────────────────
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('fleet-firebase-messaging-sw.js?v=3')
-      .then(swReg=>{
+    navigator.serviceWorker.register('fleet-firebase-messaging-sw.js?v=4')
+      .then(()=>{
         console.log('Fleet SW registered');
-        checkNotifBanner(); // set toggle immediately from localStorage
-        const wasEnabled=localStorage.getItem('fleet_notif_enabled')==='1';
-        if(wasEnabled){
-          initFirebase(swReg).catch(e=>console.log('FCM re-init:', e));
+        checkNotifBanner();
+        if(localStorage.getItem('fleet_notif_enabled')==='1'){
+          initFirebase().catch(e=>console.log('Fleet FCM re-init:',e));
         }
       })
       .catch(e=>console.log('Fleet SW error:',e));
