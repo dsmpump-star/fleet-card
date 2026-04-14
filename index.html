@@ -441,6 +441,21 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 </div>
 
 <script>
+// ── FIREBASE PUSH NOTIFICATIONS ──────────────────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyA_nJVzzbNsTLwNGwxZaf8RpaniXDMETFM",
+  authDomain: "dsm-qr-notifications.firebaseapp.com",
+  projectId: "dsm-qr-notifications",
+  storageBucket: "dsm-qr-notifications.firebasestorage.app",
+  messagingSenderId: "522523299808",
+  appId: "1:522523299808:web:9f86a2eafa2fe054446585"
+};
+const VAPID_KEY = "BI8fg36cBZWQzgMHQeJITrT5aVafyWJPAWXHRZcL0zCTzW2xPWgdtyRLRUMvMka5m5_L2RRJa5K_nu7p6xhg9wY";
+const FCM_REGISTER_URL = "https://qr-notify.dsmpump-18c.workers.dev/register";
+const FCM_UNREGISTER_URL = "https://qr-notify.dsmpump-18c.workers.dev/unregister";
+const FCM_NOTIFY_URL   = "https://qr-notify.dsmpump-18c.workers.dev/notify";
+const FCM_APP_ID = "fleet";
+
 // ─────────────────────────────────────────────────────────────────────────────
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbzeqSllDSEiM_Mf22uB3GfnYfIGQxQAOr1O_jgb3VaRu7st9iVv2ZUVKh6wecl5ycVQXw/exec';
 const RESET_PIN = '1234';
@@ -1850,20 +1865,7 @@ async function exportFleetExcel(from,to){
   toast('Excel downloaded ✅');
 }
 
-// ── FIREBASE PUSH NOTIFICATIONS ──────────────────────────────────────────────
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyA_nJVzzbNsTLwNGwxZaf8RpaniXDMETFM",
-  authDomain: "dsm-qr-notifications.firebaseapp.com",
-  projectId: "dsm-qr-notifications",
-  storageBucket: "dsm-qr-notifications.firebasestorage.app",
-  messagingSenderId: "522523299808",
-  appId: "1:522523299808:web:9f86a2eafa2fe054446585"
-};
-const VAPID_KEY = "BI8fg36cBZWQzgMHQeJITrT5aVafyWJPAWXHRZcL0zCTzW2xPWgdtyRLRUMvMka5m5_L2RRJa5K_nu7p6xhg9wY";
-const FCM_REGISTER_URL = "https://qr-notify.dsmpump-18c.workers.dev/register";
-const FCM_UNREGISTER_URL = "https://qr-notify.dsmpump-18c.workers.dev/unregister";
-const FCM_NOTIFY_URL   = "https://qr-notify.dsmpump-18c.workers.dev/notify";
-const FCM_APP_ID = "fleet";
+
 
 let _fbApp=null,_fbMessaging=null,_fcmToken=null;
 
