@@ -712,7 +712,7 @@ function switchTab(tab){
     document.getElementById('led-to').value=todayStr();
     populateLedgerFilters();
   }
-  if(tab==='settings'){renderAll();updateBackupInfo();updateDailyExcelUI();}
+  if(tab==='settings'){renderAll();updateBackupInfo();updateDailyExcelUI();checkNotifBanner();}
 }
 
 // ── DROPDOWNS ─────────────────────────────────────────────────────────────
@@ -1983,12 +1983,15 @@ async function sendPushNotification(title,body){
 }
 
 // ── PWA ──────────────────────────────────────────────────────────────────────
+// Restore toggle state immediately — don't wait for SW
+checkNotifBanner();
+
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('fleet-firebase-messaging-sw.js?v=4')
       .then(()=>{
         console.log('Fleet SW registered');
-        checkNotifBanner();
+        checkNotifBanner(); // re-check after SW ready
         if(localStorage.getItem('fleet_notif_enabled')==='1'){
           initFirebase().catch(e=>console.log('Fleet FCM re-init:',e));
         }
