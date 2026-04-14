@@ -1892,20 +1892,23 @@ function setNotifToggle(enabled){
 }
 
 async function toggleNotifications(){
-  const isEnabled=localStorage.getItem('fleet_notif_enabled')==='1'&&_fcmToken;
+  const isEnabled=localStorage.getItem('fleet_notif_enabled')==='1';
   const txt=document.getElementById('notif-btn-text');
   if(isEnabled){
     try{
-      if(_fcmToken){
+      // Use stored token if in-memory token not yet re-acquired
+      const tokenToUnregister=_fcmToken||localStorage.getItem('fleet_fcm_token');
+      if(tokenToUnregister){
         await fetch(FCM_UNREGISTER_URL,{
           method:'POST',
           headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({token:_fcmToken,app:FCM_APP_ID})
+          body:JSON.stringify({token:tokenToUnregister,app:FCM_APP_ID})
         });
       }
     }catch(e){}
     _fcmToken=null;
     localStorage.removeItem('fleet_fcm_token');
+    localStorage.setItem('fleet_notif_enabled','0');
     setNotifToggle(false);
     toast('Notifications disabled 🔕');
   } else {
@@ -1941,7 +1944,8 @@ function checkNotifBanner(){
     if(txt) txt.textContent='❌ Blocked — enable in Settings > Notifications';
     setNotifToggle(false);
   } else {
-    setNotifToggle(enabled&&!!_fcmToken);
+    // Show toggle based on localStorage only — token re-acquired silently in background
+    setNotifToggle(enabled);
   }
 }
 
@@ -2015,9 +2019,12 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('fleet-firebase-messaging-sw.js?v=3')
       .then(r=>{
         console.log('Fleet SW registered');
+        checkNotifBanner(); // set toggle immediately from localStorage
         const wasEnabled=localStorage.getItem('fleet_notif_enabled')==='1';
-        if(wasEnabled){ initFirebase().then(()=>checkNotifBanner()).catch(()=>{}); }
-        else { checkNotifBanner(); }
+        if(wasEnabled){
+          // Silently re-acquire FCM token in background so push notifications work
+          initFirebase().catch(e=>console.log('FCM re-init:', e));
+        }
       })
       .catch(e=>console.log('Fleet SW error:',e));
   });
