@@ -1953,6 +1953,7 @@ async function initFirebase(){
     if(_fcmToken){
       toast('✅ Token: '+_fcmToken.slice(0,12)+'...');
       await registerFCMToken(_fcmToken);
+      // Do NOT call setNotifToggle here — toggleNotifications handles UI after this returns
     } else {
       toast('❌ No FCM token returned','err');
     }
@@ -1996,12 +1997,13 @@ checkNotifBanner();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('fleet-firebase-messaging-sw.js')
+    navigator.serviceWorker.register('firebase-messaging-sw.js')
       .then(()=>{
         console.log('Fleet SW registered');
         checkNotifBanner(); // re-check after SW ready
         if(localStorage.getItem('fleet_notif_enabled')==='1'){
-          initFirebase().catch(e=>console.log('Fleet FCM re-init:',e));
+          // Delay background re-init so it doesn't race with user-triggered enable
+          setTimeout(()=>initFirebase().catch(e=>console.log('Fleet FCM re-init:',e)), 2000);
         }
       })
       .catch(e=>console.log('Fleet SW error:',e));
