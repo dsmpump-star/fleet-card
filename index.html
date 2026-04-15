@@ -1199,8 +1199,8 @@ function getFilteredEntries(){
     txns=txns.filter(t=>t.customer&&t.customer!=='Fleet Card');
     recv=recv.filter(r=>r.customer&&r.customer!=='Fleet Card');
   } else if(cust!=='ALL'){
-    txns=txns.filter(t=>t.customer===cust);
-    recv=recv.filter(r=>r.customer===cust);
+    txns=txns.filter(t=>(t.customer||'').trim()===cust.trim());
+    recv=recv.filter(r=>(r.customer||'').trim()===cust.trim());
   }
   return{txns,recv};
 }
@@ -1267,8 +1267,8 @@ function generateLedger(){
     txns=txns.filter(t=>t.customer&&t.customer!=='Fleet Card');
     recv=recv.filter(r=>r.customer&&r.customer!=='Fleet Card');
   } else if(cust!=='ALL'){
-    txns=txns.filter(t=>t.customer===cust);
-    recv=recv.filter(r=>r.customer===cust);
+    txns=txns.filter(t=>(t.customer||'').trim()===cust.trim());
+    recv=recv.filter(r=>(r.customer||'').trim()===cust.trim());
   }
 
   const isFleetCardView=(cust==='Fleet Card');
@@ -1437,7 +1437,7 @@ function exportLedgerExcel(){
   const isFC=(cust==='Fleet Card');
   if(cust==='Fleet Card'){txns=txns.filter(t=>t.customer==='Fleet Card'||!t.customer);recv=recv.filter(r=>r.customer==='Fleet Card'||!r.customer);}
   else if(cust==='ALL_CUSTOMERS'){txns=txns.filter(t=>t.customer&&t.customer!=='Fleet Card');recv=recv.filter(r=>r.customer&&r.customer!=='Fleet Card');}
-  else if(cust!=='ALL'){txns=txns.filter(t=>t.customer===cust);recv=recv.filter(r=>r.customer===cust);}
+  else if(cust!=='ALL'){txns=txns.filter(t=>(t.customer||'').trim()===cust.trim());recv=recv.filter(r=>(r.customer||'').trim()===cust.trim());}
   const combined=[...txns.map(t=>({...t,type:'debit'})),...recv.map(r=>({...r,type:'credit'}))].sort((a,b)=>a.date.localeCompare(b.date));
   const ledgerFY=dateToFY(from)||activeFY;
   const ob=isFC?(db.fyOpeningBalances[ledgerFY]||0):0;let bal=ob;
@@ -1510,7 +1510,7 @@ function buildLedgerHTML(compact){
   const isFC=(cust==='Fleet Card');
   if(cust==='Fleet Card'){txns=txns.filter(t=>t.customer==='Fleet Card'||!t.customer);recv=recv.filter(r=>r.customer==='Fleet Card'||!r.customer);}
   else if(cust==='ALL_CUSTOMERS'){txns=txns.filter(t=>t.customer&&t.customer!=='Fleet Card');recv=recv.filter(r=>r.customer&&r.customer!=='Fleet Card');}
-  else if(cust!=='ALL'){txns=txns.filter(t=>t.customer===cust);recv=recv.filter(r=>r.customer===cust);}
+  else if(cust!=='ALL'){txns=txns.filter(t=>(t.customer||'').trim()===cust.trim());recv=recv.filter(r=>(r.customer||'').trim()===cust.trim());}
   const combined=[...txns.map(t=>({...t,type:'debit'})),...recv.map(r=>({...r,type:'credit'}))].sort((a,b)=>a.date.localeCompare(b.date));
   const ledgerFY=dateToFY(from)||activeFY;
   const ob=isFC?(db.fyOpeningBalances[ledgerFY]||0):0;let bal=ob;
