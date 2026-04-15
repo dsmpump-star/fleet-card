@@ -591,8 +591,15 @@ async function loadFromSheet(){
       }
     });
     // Step 2: Deduplicate db.received — keep only one entry per linkedTxnId
-    // For entries with same linkedTxnId, keep the one from sheet (has real id), discard extras
+    // Sheet data is source of truth — prefer entries that came from sheet (have 'note' or are in sheetIds)
+    const sheetIds=new Set(db.received.map(r=>r.id));
     const seenLinked=new Set();
+    // Sort: entries with notes (sheet-verified) first, then others
+    db.received.sort((a,b)=>{
+      const aHasNote=(a.note||'').toLowerCase().includes('verified credit')?0:1;
+      const bHasNote=(b.note||'').toLowerCase().includes('verified credit')?0:1;
+      return aHasNote-bHasNote;
+    });
     db.received=db.received.filter(r=>{
       if(!r.linkedTxnId)return true; // non-linked entries always kept
       if(seenLinked.has(r.linkedTxnId))return false;
