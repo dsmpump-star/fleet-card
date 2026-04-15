@@ -2094,8 +2094,8 @@ function printFleetAnalytics(){
   const weeklyHTML = document.getElementById('an-weekly').innerHTML;
   const custHTML = document.getElementById('an-customers').innerHTML;
 
-  const win = window.open('','_blank','width=800,height=900');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  const _printWin = window.open('','_blank','width=800,height=900');
+  const _printHTML = `<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>Fleet Analytics — ${periodLabel}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;}
@@ -2160,8 +2160,9 @@ function printFleetAnalytics(){
     ${custHTML}
   </div>
   <div class="footer">Fleet Card Manager &nbsp;|&nbsp; DSM Pump Star</div>
-  </body></html>`);
-  win.document.close();
+  </body></html>`;
+  if(_printWin){ _printWin.document.write(_printHTML); _printWin.document.close(); }
+  else { const blob=new Blob([_printHTML],{type:'text/html'});const url=URL.createObjectURL(blob);window.location.href=url; }
 }
 
 // ── FLEET ANALYTICS ──────────────────────────────────────────────────────────
