@@ -162,6 +162,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="tab" onclick="switchTab('recv')">✅ Verify <span id="pending-badge" style="display:none;background:#DC2626;color:#fff;border-radius:10px;font-size:9px;padding:1px 5px;margin-left:2px;font-weight:800;vertical-align:middle;"></span></div>
     <div class="tab" onclick="switchTab('report')">📊 Report</div>
     <div class="tab" onclick="switchTab('ledger')">📒 Ledger</div>
+    <div class="tab" onclick="switchTab('analytics')">📈 Analytics</div>
     <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
   </div>
 </div>
@@ -352,6 +353,65 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 </div>
 
 <!-- ═══ SETTINGS ═══ -->
+<!-- ═══ ANALYTICS ═══ -->
+<div class="page" id="page-analytics">
+<style>
+.an-pbtn{flex:1;padding:8px 3px;border-radius:20px;font-size:10px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--card);color:var(--muted);}
+.an-pbtn.ap{background:var(--navy);color:#fff;border-color:var(--navy);}
+.an-card{background:var(--card);border-radius:13px;border:1px solid var(--border);padding:14px;margin-bottom:13px;}
+.an-title{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:11px;}
+.an-mom-wrap{display:flex;align-items:flex-end;gap:3px;height:110px;overflow-x:auto;padding-bottom:2px;}
+.an-mom-col{display:flex;flex-direction:column;align-items:center;min-width:38px;flex-shrink:0;}
+.an-mom-bars{display:flex;gap:2px;align-items:flex-end;width:100%;}
+.an-bar-d{background:#0C3547;border-radius:3px 3px 0 0;width:50%;transition:height .4s;}
+.an-bar-c{background:#10B981;border-radius:3px 3px 0 0;width:50%;transition:height .4s;}
+.an-mom-lbl{font-size:8px;color:var(--muted);margin-top:4px;text-align:center;}
+.an-legend{display:flex;gap:14px;justify-content:center;margin-top:8px;}
+.an-leg{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);}
+.an-dot{width:9px;height:9px;border-radius:2px;}
+.an-wk-row{display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:10px;}
+.an-wk-row:last-child{border-bottom:none;}
+.an-wk-lbl{font-size:11px;color:var(--muted);width:70px;flex-shrink:0;}
+.an-wk-bar-wrap{flex:1;background:#F1F5F9;border-radius:4px;height:8px;overflow:hidden;}
+.an-wk-bar{height:8px;border-radius:4px;background:var(--navy);}
+.an-wk-amt{font-size:11px;font-weight:700;color:var(--navy);width:75px;text-align:right;font-family:monospace;}
+.an-cr-row{display:flex;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);gap:10px;}
+.an-cr-row:last-child{border-bottom:none;}
+.an-cr-name{font-size:11px;font-weight:600;color:var(--text);flex:1;}
+.an-cr-bar-wrap{width:80px;background:#F1F5F9;border-radius:4px;height:6px;overflow:hidden;}
+.an-cr-bar{height:6px;border-radius:4px;background:var(--accent);}
+.an-cr-amt{font-size:11px;font-weight:700;color:var(--navy);width:72px;text-align:right;font-family:monospace;}
+</style>
+  <div style="display:flex;gap:5px;margin-bottom:13px;">
+    <button class="an-pbtn ap" onclick="setFleetAnPeriod('week',this)">This Week</button>
+    <button class="an-pbtn" onclick="setFleetAnPeriod('month',this)">This Month</button>
+    <button class="an-pbtn" onclick="setFleetAnPeriod('last',this)">Last Month</button>
+    <button class="an-pbtn" onclick="setFleetAnPeriod('fy',this)">Full FY</button>
+  </div>
+  <div class="tiles" style="grid-template-columns:1fr 1fr;gap:8px;margin-bottom:13px;">
+    <div class="tile t-blue"><div class="tile-val" id="an-debit" style="font-size:14px;">₹0</div><div class="tile-lbl">Total Debit</div></div>
+    <div class="tile t-green"><div class="tile-val" id="an-credit" style="font-size:14px;">₹0</div><div class="tile-lbl">Total Credit</div></div>
+    <div class="tile t-orange"><div class="tile-val" id="an-avg" style="font-size:14px;">₹0</div><div class="tile-lbl">Avg/Day</div></div>
+    <div class="tile t-red"><div class="tile-val" id="an-out" style="font-size:14px;">₹0</div><div class="tile-lbl">Outstanding</div></div>
+  </div>
+  <div class="an-card">
+    <div class="an-title">📅 Month-on-Month Comparison</div>
+    <div class="an-mom-wrap" id="an-mom"></div>
+    <div class="an-legend">
+      <div class="an-leg"><div class="an-dot" style="background:#0C3547;"></div>Debit</div>
+      <div class="an-leg"><div class="an-dot" style="background:#10B981;"></div>Credit</div>
+    </div>
+  </div>
+  <div class="an-card">
+    <div class="an-title">📆 Weekly Trend (Debit)</div>
+    <div id="an-weekly"></div>
+  </div>
+  <div class="an-card">
+    <div class="an-title">👥 Top Customers by Volume</div>
+    <div id="an-customers"></div>
+  </div>
+</div>
+
 <div class="page" id="page-settings">
   <div class="card">
     <div class="card-title">📅 Financial Years</div>
@@ -421,8 +481,11 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div id="notif-knob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;"></div>
     </div>
   </button>
-
-  <!-- BACKUP & RESTORE CARD -->
+  <p style="font-size:12px;color:var(--muted);margin-bottom:11px;">Auto-saves a JSON backup to your Google Drive. Requires one-time setup.</p>
+    
+    <div id="fleet-gdrive-last" style="font-size:11px;color:var(--muted);text-align:center;"></div>
+  </div>
+    <!-- BACKUP & RESTORE CARD -->
   <div class="card">
     <div class="card-title">💾 Backup & Restore</div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:13px;">Backup exports all data as a JSON file. Restore loads it back — requires PIN.</p>
@@ -731,7 +794,7 @@ function showFYModal(){
 // ── TABS ───────────────────────────────────────────────────────────────────
 function switchTab(tab){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['dash','dsm','recv','report','ledger','settings'][i]===tab));
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['dash','dsm','recv','report','ledger','analytics','settings'][i]===tab));
   document.getElementById('page-'+tab).classList.add('active');
   if(tab==='dash'){refreshFleetDash();return;}
   if(tab==='report'){refreshReport();refreshOutstanding();}
@@ -741,6 +804,7 @@ function switchTab(tab){
     populateLedgerFilters();
   }
   if(tab==='settings'){renderAll();updateBackupInfo();updateDailyExcelUI();checkNotifBanner();}
+  if(tab==='analytics'){refreshFleetAnalytics();}
 }
 
 // ── DROPDOWNS ─────────────────────────────────────────────────────────────
@@ -2016,6 +2080,119 @@ async function sendPushNotification(title,body){
     await fetch(FCM_NOTIFY_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,body,app:FCM_APP_ID})});
   }catch(e){ toast('❌ Push failed: '+e.message,'err'); }
 }
+
+
+// ── FLEET ANALYTICS ──────────────────────────────────────────────────────────
+let _fleetAnPeriod = 'week';
+
+function setFleetAnPeriod(p, btn) {
+  _fleetAnPeriod = p;
+  document.querySelectorAll('.an-pbtn').forEach(b => b.classList.remove('ap'));
+  if(btn) btn.classList.add('ap');
+  refreshFleetAnalytics();
+}
+
+function fleetAnDates() {
+  const today = new Date();
+  const todayStr = todayStr_();
+  let from, to = todayStr;
+  if (_fleetAnPeriod === 'week') {
+    const d = new Date(today); d.setDate(d.getDate() - 6);
+    from = d.toISOString().split('T')[0];
+  } else if (_fleetAnPeriod === 'month') {
+    from = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;
+  } else if (_fleetAnPeriod === 'last') {
+    const d = new Date(today.getFullYear(), today.getMonth()-1, 1);
+    const d2 = new Date(today.getFullYear(), today.getMonth(), 0);
+    from = d.toISOString().split('T')[0];
+    to = d2.toISOString().split('T')[0];
+  } else {
+    const fy = fyDates(activeFY);
+    from = fy.from; to = fy.to < todayStr ? fy.to : todayStr;
+  }
+  return {from, to};
+}
+function todayStr_(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+
+function refreshFleetAnalytics() {
+  const {from, to} = fleetAnDates();
+  const txns = db.transactions.filter(t => t.date >= from && t.date <= to);
+  const recv = db.received.filter(r => r.date >= from && r.date <= to);
+
+  const totalDr = txns.reduce((s,t) => s+t.amount, 0);
+  const totalCr = recv.reduce((s,r) => s+r.amount, 0);
+  const outstanding = txns.filter(t=>!creditedMap[t.id]).reduce((s,t)=>s+t.amount,0);
+
+  // Unique days with entries
+  const days = new Set([...txns.map(t=>t.date),...recv.map(r=>r.date)]);
+  const dayCount = Math.max(days.size, 1);
+  const avgDay = totalDr / dayCount;
+
+  document.getElementById('an-debit').textContent = fmtAmt(totalDr);
+  document.getElementById('an-credit').textContent = fmtAmt(totalCr);
+  document.getElementById('an-avg').textContent = fmtAmt(avgDay);
+  document.getElementById('an-out').textContent = fmtAmt(outstanding);
+
+  // Month-on-Month — last 6 months
+  const months = [];
+  const now = new Date();
+  for(let i=5; i>=0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const mFrom = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+    const mTo = new Date(d.getFullYear(), d.getMonth()+1, 0).toISOString().split('T')[0];
+    const mDr = db.transactions.filter(t=>t.date>=mFrom&&t.date<=mTo).reduce((s,t)=>s+t.amount,0);
+    const mCr = db.received.filter(r=>r.date>=mFrom&&r.date<=mTo).reduce((s,r)=>s+r.amount,0);
+    months.push({label: d.toLocaleString('default',{month:'short'}), dr:mDr, cr:mCr});
+  }
+  const maxMom = Math.max(...months.map(m=>Math.max(m.dr,m.cr)),1);
+  document.getElementById('an-mom').innerHTML = months.map(m=>`
+    <div class="an-mom-col">
+      <div class="an-mom-bars" style="height:90px;align-items:flex-end;">
+        <div class="an-bar-d" style="height:${Math.max((m.dr/maxMom)*90,2)}px;" title="${fmtAmt(m.dr)}"></div>
+        <div class="an-bar-c" style="height:${Math.max((m.cr/maxMom)*90,2)}px;" title="${fmtAmt(m.cr)}"></div>
+      </div>
+      <div class="an-mom-lbl">${m.label}</div>
+    </div>`).join('');
+
+  // Weekly Trend — last 8 weeks
+  const weeks = [];
+  for(let i=7; i>=0; i--) {
+    const wEnd = new Date(now); wEnd.setDate(wEnd.getDate() - i*7);
+    const wStart = new Date(wEnd); wStart.setDate(wEnd.getDate()-6);
+    const wFrom = wStart.toISOString().split('T')[0];
+    const wTo = wEnd.toISOString().split('T')[0];
+    const wDr = db.transactions.filter(t=>t.date>=wFrom&&t.date<=wTo).reduce((s,t)=>s+t.amount,0);
+    const label = `${String(wStart.getDate()).padStart(2,'0')}/${String(wStart.getMonth()+1).padStart(2,'0')}`;
+    weeks.push({label, dr: wDr});
+  }
+  const maxWk = Math.max(...weeks.map(w=>w.dr),1);
+  document.getElementById('an-weekly').innerHTML = weeks.map(w=>`
+    <div class="an-wk-row">
+      <div class="an-wk-lbl">${w.label}</div>
+      <div class="an-wk-bar-wrap"><div class="an-wk-bar" style="width:${Math.max((w.dr/maxWk)*100,2)}%;"></div></div>
+      <div class="an-wk-amt">${w.dr>0?fmtAmt(w.dr):'—'}</div>
+    </div>`).join('');
+
+  // Top Customers
+  const custMap = {};
+  txns.forEach(t=>{
+    if(t.customer&&t.customer!=='Fleet Card'){
+      custMap[t.customer]=(custMap[t.customer]||0)+t.amount;
+    }
+  });
+  const topCusts = Object.entries(custMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const maxCust = topCusts.length ? topCusts[0][1] : 1;
+  document.getElementById('an-customers').innerHTML = topCusts.length
+    ? topCusts.map(([name,amt])=>`
+      <div class="an-cr-row">
+        <div class="an-cr-name">${name}</div>
+        <div class="an-cr-bar-wrap"><div class="an-cr-bar" style="width:${(amt/maxCust)*100}%;"></div></div>
+        <div class="an-cr-amt">${fmtAmt(amt)}</div>
+      </div>`).join('')
+    : '<div class="empty" style="padding:20px 0;"><p>No customer entries in this period</p></div>';
+}
+
+
 
 // ── PWA ──────────────────────────────────────────────────────────────────────
 // Restore toggle state immediately — don't wait for SW
