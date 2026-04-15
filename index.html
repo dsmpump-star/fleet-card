@@ -604,7 +604,27 @@ async function loadFromSheet(){
     loadCreditedMap();
     db.received.forEach(r=>{
       if(r.linkedTxnId&&!creditedMap[r.linkedTxnId]){
-        creditedMap[r.linkedTxnId]={creditedAt:r.savedAt||new Date().toISOString(),note:''};
+        // Extract note without 'Verified credit' prefix for display
+        const noteClean=(r.note||'').replace(/^Verified credit\s*[-–]?\s*/i,'').trim();
+        creditedMap[r.linkedTxnId]={creditedAt:r.savedAt||new Date().toISOString(),note:noteClean};
+      }
+    });
+    // Also try to credit by matching customer+amount+date for manually-added received entries
+    // that couldn't be matched by tid+batch (e.g. manually entered in sheet)
+    db.received.forEach(r=>{
+      if(!r.linkedTxnId&&(r.note||'').toLowerCase().includes('verified credit')){
+        // Try match by customer + amount + date
+        const match=db.transactions.find(t=>
+          !creditedMap[t.id]&&
+          String(t.customer||'').toLowerCase()===String(r.customer||'').toLowerCase()&&
+          Math.abs(t.amount-r.amount)<0.01&&
+          t.date===r.date
+        );
+        if(match){
+          r.linkedTxnId=match.id;
+          const noteClean=(r.note||'').replace(/^Verified credit\s*[-–]?\s*/i,'').trim();
+          creditedMap[match.id]={creditedAt:r.savedAt||new Date().toISOString(),note:noteClean};
+        }
       }
     });
     saveCreditedMap();
@@ -937,7 +957,9 @@ function txnHTML(t,showDel){
         <div class="e-sub">👤 ${t.customer||'Fleet Card'} · 📅 ${fmtDate(t.date)}${ts?' · 🕐 '+ts:''}</div>
         ${(()=>{
           const sm=t.remark&&t.remark.match(/STNO[:\s]+([\d]+)/i);
-          const rem=t.remark?t.remark.replace(/STNO[:\s]+[\d]+\s*[—\-–]?\s*/i,'').trim():'';
+          // Guard: don't show ISO timestamps as remark (column migration artefact)
+          const isISODate=t.remark&&/^\d{4}-\d{2}-\d{2}T/.test(t.remark.trim());
+          const rem=(!isISODate&&t.remark)?t.remark.replace(/STNO[:\s]+[\d]+\s*[—\-–]?\s*/i,'').trim():'';
           return (sm?`<div style="font-size:11px;color:var(--blue);font-weight:700;margin-top:3px;">🔖 STNO: ${sm[1]}</div>`:'')
                + (rem?`<div style="font-size:11px;color:var(--muted);margin-top:2px;">📝 ${rem}</div>`:'');
         })()}
@@ -1111,7 +1133,8 @@ function refreshRecv(){
     const v=creditedMap[t.id]||{};
     const verifiedTime=v.creditedAt?new Date(v.creditedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
     // Extract STNO from remark if present
-    const stnoMatch=t.remark&&t.remark.match(/STNO[:\s]+([\d]+)/i);
+    const isISODate=t.remark&&/^\d{4}-\d{2}-\d{2}T/.test(t.remark.trim());
+    const stnoMatch=!isISODate&&t.remark&&t.remark.match(/STNO[:\s]+([\d]+)/i);
     const stnoDisplay=stnoMatch?`<div style="font-size:11px;color:var(--blue);font-weight:700;margin-top:3px;">🔖 STNO: ${stnoMatch[1]}</div>`:'';
     const stnoNote=stnoMatch?'STNO: '+stnoMatch[1]:'';
     return`<div class="entry-item" style="border-left:4px solid ${isVerified?'var(--green)':'var(--accent)'};${isVerified?'opacity:.85':''}">
