@@ -585,7 +585,8 @@ async function loadFromSheet(){
           String(t.tid).trim()===String(r.tid).trim()&&
           String(t.batch)===String(r.batch)&&
           t.date===r.date&&
-          Math.abs(t.amount-r.amount)<0.01
+          Math.abs(t.amount-r.amount)<0.01&&
+          String(t.customer||'').trim()===String(r.customer||'').trim()
         );
         if(match)r.linkedTxnId=match.id;
       }
