@@ -13,13 +13,9 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Handle background messages (when app is closed/minimized)
 messaging.onBackgroundMessage(payload => {
-  // notification field = FCM already shows it natively on Android
-  // Only show manually for data-only payloads (no notification key)
-  if (payload.notification) return; // browser handles it
-  console.log('[FCM] Fleet Background message:', payload);
-  const { title, body, icon, link } = payload.data || {};
+  if (payload.notification) return;
+  const { title, body, icon } = payload.data || {};
   self.registration.showNotification(title || 'Fleet Entry Checker', {
     body: body || 'New entry saved',
     icon: icon || '/fleet-card/fleet-icon-192.png',
@@ -29,39 +25,11 @@ messaging.onBackgroundMessage(payload => {
   });
 });
 
-// PWA cache logic
-const CACHE_NAME = 'fleet-epos-v9';
-const ASSETS = [
-  '/fleet-card/index.html',
-  '/fleet-card/fleet-icon-192.png',
-  '/fleet-card/fleet-icon-512.png'
-];
-
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
-  self.skipWaiting();
-});
-
+// NO PWA caching - always fetch fresh from network
+self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
-  );
+  // Clear ALL old caches on activate
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))));
   self.clients.claim();
 });
-
-self.addEventListener('fetch', e => {
-  if (e.request.url.includes('script.google.com') ||
-      e.request.url.includes('firebase') ||
-      e.request.url.includes('googleapis')) return;
-  e.respondWith(
-    fetch(e.request)
-      .then(res => {
-        const clone = res.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
-        return res;
-      })
-      .catch(() => caches.match(e.request))
-  );
-});
+// No fetch handler - browser fetches normally
