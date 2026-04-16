@@ -30,13 +30,11 @@ messaging.onBackgroundMessage(payload => {
 });
 
 // PWA cache logic
-const CACHE_NAME = 'fleet-epos-v6';
+const CACHE_NAME = 'fleet-epos-v7';
 const ASSETS = [
   '/fleet-card/index.html',
-  '/fleet-card/fleet-manifest.json',
   '/fleet-card/fleet-icon-192.png',
-  '/fleet-card/fleet-icon-512.png',
-  '/fleet-card/firebase-messaging-sw.js'
+  '/fleet-card/fleet-icon-512.png'
 ];
 
 self.addEventListener('install', e => {
