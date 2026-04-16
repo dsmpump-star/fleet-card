@@ -939,12 +939,11 @@ async function saveDSM(){
   const customer=document.getElementById('dsm-cust').value||'Fleet Card';
   // Validate STNO for customer entries
   const stnoVal=document.getElementById('dsm-stno').value.trim();
+  const stnoNums=stnoVal?stnoVal.split(/\s+/).filter(Boolean):[];
   if(customer!=='Fleet Card'){
     if(!stnoVal) return toast('Statement No(s) required for customer entries','err');
-    const stnoNums=stnoVal.split(/\s+/).filter(Boolean);
     if(stnoNums.some(n=>!/^\d+$/.test(n)||parseInt(n)<1)) return toast('STNO must be numbers (e.g. 37 38 39)','err');
   }
-  const stnoNums=stnoVal?stnoVal.split(/\s+/).filter(Boolean):[];
   const stnoPrefix=customer!=='Fleet Card'&&stnoNums.length?'STNO: '+stnoNums.join(' ')+' — ':'';
   const batch=document.getElementById('dsm-batch').value.trim();
   const date=document.getElementById('dsm-date').value;
