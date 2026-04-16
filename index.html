@@ -1234,7 +1234,7 @@ function refreshRecv(){
           <div class="e-main">${t.tid?t.tid+' · ':''}Batch #${t.batch}</div>
           <div class="e-sub">👤 ${t.customer||'Fleet Card'} · 📅 ${fmtDate(t.date)}</div>
           ${stnoDisplay}
-          ${t.remark&&!stnoMatch?`<div style="font-size:11px;color:var(--muted);margin-top:2px;">📝 ${t.remark}</div>`:''}
+          ${t.remark&&!stnoNums2.length?`<div style="font-size:11px;color:var(--muted);margin-top:2px;">📝 ${t.remark.replace(/STNO:\s*[\d\s]+?\s*[—\-–]\s*/i,'').trim()}</div>`:''}
           ${isVerified?`<div style="font-size:10px;color:var(--green);font-weight:700;margin-top:4px;">✅ Credited verified · ${verifiedTime}${v.note?' · '+v.note:''}</div>`
             :`<div style="margin-top:8px;"><input type="text" id="note-${t.id}" placeholder="Note / Ref no. (optional)" value="${stnoNote}" style="font-size:12px;padding:7px 10px;border-radius:8px;border:1.5px solid var(--border);width:100%;background:#FAFAFA;font-family:'DM Sans',sans-serif;color:var(--text);" /></div>`}
         </div>
