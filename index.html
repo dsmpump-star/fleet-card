@@ -226,11 +226,12 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="big-wrap"><span class="big-sym">₹</span><input type="number" id="dsm-amount" class="big-input" placeholder="0.00" min="0" step="0.01"></div>
     </div>
     <div class="form-row" id="stno-row" style="display:none;">
-      <label>STNO: Statement No(s) <span style="color:var(--red);font-size:12px;">*</span> <span style="font-size:10px;color:var(--muted);">Space-separated for multiple: 37 38 39</span></label>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-weight:700;color:var(--muted);font-size:13px;">STNO:</span>
-        <input type="text" id="dsm-stno" placeholder="e.g. 37 38 39" inputmode="numeric" style="flex:1;">
+      <label>STNO: Statement No(s) <span style="color:var(--red);font-size:12px;">*</span> <span style="font-size:10px;color:var(--muted);">Tap + to add each number</span></label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div id="stno-badges" style="display:flex;flex-wrap:wrap;gap:4px;flex:1;min-height:38px;align-items:center;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:6px 10px;"></div>
+        <button type="button" onclick="stnoAddPrompt()" style="background:var(--navy);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:20px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1;">+</button>
       </div>
+      <input type="hidden" id="dsm-stno">
     </div>
     <div class="form-row"><label>Remark <span style="font-size:10px;color:var(--muted);font-weight:500;">(slip ref / vehicle no. / optional)</span></label><input type="text" id="dsm-remark" placeholder="e.g. MH-12-AB-1234"></div>
     <button class="btn btn-primary" onclick="saveDSM()">＋ Save Debit Entry</button>
@@ -921,6 +922,39 @@ function onDsmTIDChange(){
 }
 
 
+function stnoAddPrompt(){
+  const val = prompt('Enter Statement No:');
+  if(!val) return;
+  const n = val.trim();
+  if(!/^\d+$/.test(n)||parseInt(n)<1){toast('Enter a valid number','err');return;}
+  const hidden = document.getElementById('dsm-stno');
+  const current = hidden.value.trim();
+  const nums = current ? current.split(' ') : [];
+  if(nums.includes(n)){toast('Already added','err');return;}
+  nums.push(n);
+  hidden.value = nums.join(' ');
+  renderSTNOBadges();
+}
+function removeSTNO(n){
+  const hidden = document.getElementById('dsm-stno');
+  const nums = hidden.value.trim().split(' ').filter(x=>x&&x!==n);
+  hidden.value = nums.join(' ');
+  renderSTNOBadges();
+}
+function renderSTNOBadges(){
+  const hidden = document.getElementById('dsm-stno');
+  const badges = document.getElementById('stno-badges');
+  if(!badges) return;
+  const nums = hidden.value.trim() ? hidden.value.trim().split(' ').filter(Boolean) : [];
+  badges.innerHTML = nums.length
+    ? nums.map(n=>`<span style="background:#DBEAFE;color:#1E40AF;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;display:flex;align-items:center;gap:4px;">🔖 ${n}<span onclick="removeSTNO('${n}')" style="cursor:pointer;font-size:13px;color:#6B7280;margin-left:2px;">×</span></span>`).join('')
+    : '<span style="font-size:11px;color:var(--muted);">Tap + to add statement numbers</span>';
+}
+function clearSTNOBadges(){
+  const hidden = document.getElementById('dsm-stno');
+  if(hidden) hidden.value = '';
+  renderSTNOBadges();
+}
 function onCustChange(){
   const cust=document.getElementById('dsm-cust').value;
   const stnoRow=document.getElementById('stno-row');
@@ -988,6 +1022,7 @@ Continue?`))return;
   document.getElementById('dsm-batch').value='';
   document.getElementById('dsm-remark').value='';
   document.getElementById('dsm-stno').value='';
+  clearSTNOBadges();
   onCustChange();
   toast(`Saved ✓  ${customer}  Batch #${batch}  ${fmtAmt(amount)}`);
   fleetLog('save', `Saved Batch #${batch} — ${customer} — ${fmtAmt(amount)}${stnoNums.length?' — STNO: '+stnoNums.join(' '):''}`);
