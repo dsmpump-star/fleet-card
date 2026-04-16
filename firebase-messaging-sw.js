@@ -30,7 +30,7 @@ messaging.onBackgroundMessage(payload => {
 });
 
 // PWA cache logic
-const CACHE_NAME = 'fleet-epos-v8';
+const CACHE_NAME = 'fleet-epos-v9';
 const ASSETS = [
   '/fleet-card/index.html',
   '/fleet-card/fleet-icon-192.png',
