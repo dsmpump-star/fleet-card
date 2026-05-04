@@ -956,7 +956,7 @@ function clearSTNOBadges(){
 function onCustChange(){
   const cust=document.getElementById('dsm-cust').value;
   const amtInput=document.getElementById('dsm-amount');
-  if(cust==='NIL'){amtInput.placeholder='0 (NIL — no amount needed)';amtInput.value='';}
+  if(cust==='NIL'){amtInput.placeholder='0 (NIL — no amount needed)';amtInput.value='';const sr=document.getElementById('stno-row');if(sr)sr.style.display='none';}
   else{amtInput.placeholder='0.00';}
   const stnoRow=document.getElementById('stno-row');
   const stnoInput=document.getElementById('dsm-stno');
@@ -975,7 +975,7 @@ async function saveDSM(){
   const customer=document.getElementById('dsm-cust').value||'Fleet Card';
   // Validate STNO for customer entries
   const stnoVal=document.getElementById('dsm-stno').value.trim();
-  if(customer!=='Fleet Card'){
+  if(customer!=='Fleet Card'&&customer!=='NIL'){
     if(!stnoVal) return toast('Statement No(s) required for customer entries','err');
     const stnoNums=stnoVal.split(/\s+/).filter(Boolean);
     if(stnoNums.some(n=>!/^\d+$/.test(n)||parseInt(n)<1)) return toast('STNO must be numbers (e.g. 37 38 39)','err');
