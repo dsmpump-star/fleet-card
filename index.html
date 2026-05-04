@@ -955,6 +955,9 @@ function clearSTNOBadges(){
 }
 function onCustChange(){
   const cust=document.getElementById('dsm-cust').value;
+  const amtInput=document.getElementById('dsm-amount');
+  if(cust==='NIL'){amtInput.placeholder='0 (NIL — no amount needed)';amtInput.value='';}
+  else{amtInput.placeholder='0.00';}
   const stnoRow=document.getElementById('stno-row');
   const stnoInput=document.getElementById('dsm-stno');
   if(cust&&cust!=='Fleet Card'){
@@ -985,7 +988,7 @@ async function saveDSM(){
   if(!tid)return toast('Select a TID — required','err');
   if(!batch)return toast('Enter batch number','err');
   if(!date)return toast('Select a date','err');
-  if(!amount||amount<=0)return toast('Enter a valid amount','err');
+  if(customer!=='NIL'&&(!amount||amount<=0))return toast('Enter a valid amount','err');
   // Duplicate batch check for same TID
   if(db.transactions.some(t=>t.tid===tid&&String(t.batch)===String(batch))){
     if(!confirm(`⚠️ Batch #${batch} already exists for ${tid}. Are you sure this is not a duplicate?`))return;
@@ -1011,7 +1014,8 @@ Continue?`))return;
   // Warn if date outside active FY
   if(!inFY(date,activeFY)){const{from,to}=fyDates(activeFY);if(!confirm(`Date ${fmtDate(date)} is outside ${fyLabel(activeFY)} (${fmtDate(from)}–${fmtDate(to)}). Save anyway?`))return;}
   const remark=stnoPrefix+(document.getElementById('dsm-remark').value.trim());
-  const entry={id:uid(),tid,customer,batch,date,amount,remark,createdAt:new Date().toISOString()};
+  const entryAmount=customer==='NIL'?0:(amount||0);
+  const entry={id:uid(),tid,customer,batch,date,amount:entryAmount,remark,createdAt:new Date().toISOString()};
   db.transactions.push(entry);
   // ensure FY is tracked
   const entryFY=dateToFY(date);
