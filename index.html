@@ -215,7 +215,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <div class="card">
     <div class="card-title">📲 New Debit Entry</div>
     <div class="form-row"><label>Select TID *</label><select id="dsm-tid" onchange="onDsmTIDChange()"><option value="">— Choose TID —</option></select></div>
-    <div class="form-row"><label>Customer / Particulars</label><select id="dsm-cust" onchange="onCustChange()"></select></div>
+    <div class="form-row" style="display:none;"><label>Customer / Particulars</label><select id="dsm-cust" onchange="onCustChange()"></select></div>
     <div class="form-row-2">
       <div><label>Batch No. <span style="font-size:10px;color:var(--green);font-weight:600;">(auto-filled)</span></label><input type="number" id="dsm-batch" placeholder="Auto from TID" min="1" style="background:#F0F9FF;border-color:#BAE6FD;"></div>
       <div><label>Date</label><input type="date" id="dsm-date"></div>
@@ -224,7 +224,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <label>Debit Amount (₹)</label>
       <div class="big-wrap"><span class="big-sym">₹</span><input type="number" id="dsm-amount" class="big-input" placeholder="0.00" min="0" step="0.01"></div>
     </div>
-    <div class="form-row" id="stno-row" style="display:none;">
+    <div class="form-row" id="stno-row" style="display:none!important;">
       <label>STNO: Statement No(s) <span style="color:var(--red);font-size:12px;">*</span> <span style="font-size:10px;color:var(--muted);">Tap + to add each number</span></label>
       <div style="display:flex;gap:8px;align-items:center;">
         <div id="stno-badges" style="display:flex;flex-wrap:wrap;gap:4px;flex:1;min-height:38px;align-items:center;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:6px 10px;"></div>
@@ -290,7 +290,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
     <div class="form-row-2">
       <div><label>TID</label><select id="rep-tid" onchange="refreshReport()"><option value="ALL">All TIDs</option></select></div>
-      <div><label>Particulars</label><select id="rep-cust" onchange="refreshReport()"><option value="ALL">All</option><option value="Fleet Card">Fleet Card</option><option value="ALL_CUSTOMERS">All Customers</option></select></div>
+      <div><label>Particulars</label><select id="rep-cust" onchange="refreshReport()"><option value="ALL">All</option><option value="Fleet Card">Fleet Card</option></select></div>
     </div>
   </div>
   <div class="tiles">
@@ -306,7 +306,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <div style="background:var(--navy2);border-radius:10px 10px 0 0;padding:10px 13px;color:#fff;font-size:12px;font-weight:700;">📋 Transaction Report</div>
   <div class="tbl-wrap" style="border-radius:0 0 12px 12px;border-top:none;" id="rep-tbl"></div>
 
-  <!-- Customer Outstanding Dashboard -->
+  <!-- Customer Outstanding Dashboard (moved to Customer Pouch app) -->
   <div style="margin-top:16px;">
     <div style="background:var(--navy2);border-radius:10px 10px 0 0;padding:10px 13px;color:#fff;font-size:12px;font-weight:700;display:flex;justify-content:space-between;align-items:center;">
       <span>👥 Customer Outstanding — <span id="out-fy-label" style="color:var(--accent);"></span></span>
@@ -326,7 +326,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
     <div class="form-row-2">
       <div><label>TID</label><select id="led-tid"><option value="ALL">All TIDs</option></select></div>
-      <div><label>Particulars</label><select id="led-cust"><option value="ALL">All (Fleet Card + Customers)</option><option value="Fleet Card">Fleet Card Only</option><option value="ALL_CUSTOMERS">All Customers (Combined)</option></select></div>
+      <div><label>Particulars</label><select id="led-cust"><option value="ALL">All (Fleet Card + Customers)</option><option value="Fleet Card">Fleet Card Only</option></select></div>
     </div>
     <button class="btn btn-primary" onclick="generateLedger()" style="width:100%;margin-bottom:6px;">📒 Generate Ledger</button>
     <button class="btn" onclick="generateFleetMonthSummary()" style="width:100%;margin-bottom:6px;background:#10B981;color:#fff;">📅 Month-wise Summary</button>
@@ -412,8 +412,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div id="an-weekly"></div>
   </div>
   <div class="an-card">
-    <div class="an-title">👥 Top Customers by Volume</div>
-    <div id="an-customers"></div>
+    <div class="an-title" style="display:none;">👥 Top Customers by Volume</div>
+    <div id="an-customers" style="display:none;"></div>
   </div>
 </div>
 
@@ -455,7 +455,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
   </div>
   <div class="card">
-    <div class="card-title">👥 Manage Customers</div>
+    <div class="card-title" style="display:none;">👥 Manage Customers</div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:11px;">Fleet Card is always available by default.</p>
     <div id="cust-list" style="margin-bottom:11px;"></div>
     <div style="display:flex;gap:8px;">
@@ -838,7 +838,7 @@ function populateDropdowns(){
     const cur=rc.value||'ALL';
     rc.innerHTML='<option value="ALL">All (Everything)</option>'
       +'<option value="Fleet Card">Fleet Card</option>'
-      +'<option value="ALL_CUSTOMERS">All Customers (Combined)</option>'
+      +''
       +(db.customers||[]).map(c=>`<option value="${c}"${c===cur?' selected':''}>${c}</option>`).join('');
     if(cur&&rc.querySelector(`option[value="${cur}"]`))rc.value=cur;
   }
@@ -847,7 +847,7 @@ function populateDropdowns(){
     const cur=lc.value||'ALL';
     lc.innerHTML='<option value="ALL">All (Fleet Card + Customers)</option>'
       +'<option value="Fleet Card">Fleet Card Only</option>'
-      +'<option value="ALL_CUSTOMERS">All Customers (Combined)</option>'
+      +''
       +(db.customers||[]).map(c=>`<option value="${c}"${c===cur?' selected':''}>${c} Only</option>`).join('');
     if(cur&&lc.querySelector(`option[value="${cur}"]`))lc.value=cur;
   }
@@ -972,7 +972,7 @@ function onCustChange(){
 
 async function saveDSM(){
   const tid=document.getElementById('dsm-tid').value.trim();
-  const customer=document.getElementById('dsm-cust').value||'Fleet Card';
+  const customer='Fleet Card'; // Locked — customer entries moved to Customer Pouch app
   // Validate STNO for customer entries
   const stnoVal=document.getElementById('dsm-stno').value.trim();
   if(customer!=='Fleet Card'&&customer!=='NIL'){
