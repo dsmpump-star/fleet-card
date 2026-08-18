@@ -294,17 +294,23 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
   </div>
   <div class="tiles">
-    <div class="tile t-r"><div class="tile-val" id="rt-dr">₹0</div><div class="tile-lbl">Total Debit</div></div>
-    <div class="tile t-g"><div class="tile-val" id="rt-cr">₹0</div><div class="tile-lbl">Total Credit</div></div>
-    <div class="tile t-o"><div class="tile-val" id="rt-bal">₹0</div><div class="tile-lbl">Net Balance</div></div>
-    <div class="tile t-b"><div class="tile-val" id="rt-cnt">0</div><div class="tile-lbl">Entries</div></div>
+    <div class="tile t-b"><div class="tile-val" id="rt-total">₹0</div><div class="tile-lbl">Total Amount</div></div>
+    <div class="tile t-g"><div class="tile-val" id="rt-verified">₹0</div><div class="tile-lbl">Verified</div></div>
+    <div class="tile t-o"><div class="tile-val" id="rt-pending">₹0</div><div class="tile-lbl">Pending</div></div>
+    <div class="tile t-r"><div class="tile-val" id="rt-cnt">0</div><div class="tile-lbl">Entries</div></div>
   </div>
   <div class="export-row">
     <button class="btn btn-accent" onclick="exportExcel()">⬇ Excel</button>
     <button class="btn btn-primary" onclick="exportPDF()">⬇ PDF</button>
   </div>
-  <div style="background:var(--navy2);border-radius:10px 10px 0 0;padding:10px 13px;color:#fff;font-size:12px;font-weight:700;">📋 Transaction Report</div>
+  <div style="background:var(--navy2);border-radius:10px 10px 0 0;padding:10px 13px;color:#fff;font-size:12px;font-weight:700;">📋 Entries — Verified / Pending</div>
   <div class="tbl-wrap" style="border-radius:0 0 12px 12px;border-top:none;" id="rep-tbl"></div>
+
+  <!-- TID-wise Summary -->
+  <div style="margin-top:16px;">
+    <div style="background:var(--navy2);border-radius:10px 10px 0 0;padding:10px 13px;color:#fff;font-size:12px;font-weight:700;">🔢 TID-wise Summary</div>
+    <div class="tbl-wrap" style="border-radius:0 0 12px 12px;border-top:none;" id="rep-tid-summary"></div>
+  </div>
 
   <!-- Customer Outstanding Dashboard (moved to Customer Pouch app) -->
   <div style="margin-top:16px;">
@@ -334,9 +340,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   </div>
   <div id="ledger-output" style="display:none;">
     <div class="bal-banner">
-      <div class="bal-item"><div class="bal-lbl">Opening Balance</div><div class="bal-val" id="led-ob">₹0</div></div>
-      <div class="bal-item"><div class="bal-lbl">Closing Balance</div><div class="bal-val" id="led-cb">₹0</div></div>
-      <div class="bal-item"><div class="bal-lbl">Net Movement</div><div class="bal-val" id="led-net">₹0</div></div>
+      <div class="bal-item"><div class="bal-lbl">Total Entries</div><div class="bal-val" id="led-total">0</div></div>
+      <div class="bal-item"><div class="bal-lbl">Verified</div><div class="bal-val pos" id="led-verified">₹0</div></div>
+      <div class="bal-item"><div class="bal-lbl">Pending</div><div class="bal-val neg" id="led-pending">₹0</div></div>
     </div>
     <div class="export-row">
       <button class="btn btn-accent" onclick="exportLedgerExcel()">⬇ Excel</button>
@@ -345,11 +351,16 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
     <div class="ledger-wrap">
       <div class="ledger-hdr">
-        <div class="ledger-hdr-row">
-          <span>Date</span><span>Particulars / TID / Batch</span><span style="text-align:right">Debit</span><span style="text-align:right">Credit</span><span style="text-align:right">Balance</span>
+        <div class="ledger-hdr-row" style="grid-template-columns:90px 90px 1fr 130px;">
+          <span>Date</span><span>TID</span><span>Batch / Amount</span><span style="text-align:right">Status</span>
         </div>
       </div>
       <div id="ledger-rows"></div>
+    </div>
+    <!-- TID-wise Summary -->
+    <div style="margin-top:16px;">
+      <div style="background:var(--navy2);border-radius:10px 10px 0 0;padding:10px 13px;color:#fff;font-size:12px;font-weight:700;">🔢 TID-wise Summary</div>
+      <div class="tbl-wrap" style="border-radius:0 0 12px 12px;border-top:none;" id="ledger-tid-summary"></div>
     </div>
   </div>
 </div>
@@ -1334,46 +1345,69 @@ function getFilteredEntries(){
   return{txns,recv};
 }
 
+function renderTidSummary(containerId,txns){
+  const container=document.getElementById(containerId);
+  if(!container)return;
+  const map={};
+  txns.forEach(t=>{
+    const tid=t.tid||'—';
+    if(!map[tid])map[tid]={count:0,total:0,verified:0,pending:0,vCount:0,pCount:0};
+    map[tid].count++;map[tid].total+=t.amount;
+    if(creditedMap[t.id]){map[tid].verified+=t.amount;map[tid].vCount++;}
+    else{map[tid].pending+=t.amount;map[tid].pCount++;}
+  });
+  const tids=Object.keys(map).sort();
+  if(!tids.length){container.innerHTML='<div class="empty"><div class="ico">🔢</div><p>No data for this period</p></div>';return;}
+  let h=`<table class="tbl"><thead><tr><th>TID</th><th>Entries</th><th style="text-align:right">Total</th><th style="text-align:right">Verified</th><th style="text-align:right">Pending</th></tr></thead><tbody>`;
+  let gCount=0,gTotal=0,gVerified=0,gPending=0;
+  tids.forEach(tid=>{
+    const d=map[tid];
+    gCount+=d.count;gTotal+=d.total;gVerified+=d.verified;gPending+=d.pending;
+    h+=`<tr>
+      <td style="font-family:'Roboto Mono',monospace;font-weight:700;">${tid}</td>
+      <td>${d.count}</td>
+      <td style="font-family:'Roboto Mono',monospace;text-align:right;font-weight:700;">${fmtAmt(d.total)}</td>
+      <td style="font-family:'Roboto Mono',monospace;text-align:right;color:var(--green);font-weight:700;">${fmtAmt(d.verified)}</td>
+      <td style="font-family:'Roboto Mono',monospace;text-align:right;color:var(--orange);font-weight:700;">${fmtAmt(d.pending)}</td>
+    </tr>`;
+  });
+  h+=`</tbody><tfoot><tr><td>TOTAL</td><td>${gCount}</td><td style="font-family:'Roboto Mono',monospace;text-align:right;">${fmtAmt(gTotal)}</td><td style="font-family:'Roboto Mono',monospace;text-align:right;">${fmtAmt(gVerified)}</td><td style="font-family:'Roboto Mono',monospace;text-align:right;">${fmtAmt(gPending)}</td></tr></tfoot></table>`;
+  container.innerHTML=h;
+}
+
 function refreshReport(){
   populateDropdowns();
-  const {txns,recv}=getFilteredEntries();
-  const totalDr=txns.reduce((s,t)=>s+t.amount,0);
-  const totalCr=recv.reduce((s,r)=>s+r.amount,0);
-  const cust=document.getElementById('rep-cust').value;
-  const isFleetCard=(cust==='Fleet Card');
-  const ob=isFleetCard?getOB():0;
-  const bal=ob+totalCr-totalDr;
-  document.getElementById('rt-dr').textContent=fmtAmt(totalDr);
-  document.getElementById('rt-cr').textContent=fmtAmt(totalCr);
-  document.getElementById('rt-bal').textContent=fmtAmt(bal);
-  document.getElementById('rt-cnt').textContent=txns.length+recv.length;
+  const {txns}=getFilteredEntries();
+  const verifiedTxns=txns.filter(t=>creditedMap[t.id]);
+  const pendingTxns=txns.filter(t=>!creditedMap[t.id]);
+  const totalAmt=txns.reduce((s,t)=>s+t.amount,0);
+  const verifiedAmt=verifiedTxns.reduce((s,t)=>s+t.amount,0);
+  const pendingAmt=pendingTxns.reduce((s,t)=>s+t.amount,0);
+  document.getElementById('rt-total').textContent=fmtAmt(totalAmt);
+  document.getElementById('rt-verified').textContent=fmtAmt(verifiedAmt);
+  document.getElementById('rt-pending').textContent=fmtAmt(pendingAmt);
+  document.getElementById('rt-cnt').textContent=txns.length;
 
-  const combined=[
-    ...txns.map(t=>({...t,type:'debit'})),
-    ...recv.map(r=>({...r,type:'credit'}))
-  ].sort((a,b)=>a.date.localeCompare(b.date)||(a.createdAt||a.savedAt||'').localeCompare(b.createdAt||b.savedAt||''));
+  const sorted=[...txns].sort((a,b)=>a.date.localeCompare(b.date)||(a.createdAt||'').localeCompare(b.createdAt||''));
 
   const tbl=document.getElementById('rep-tbl');
-  if(!combined.length){tbl.innerHTML='<div class="empty"><div class="ico">📊</div><p>No data for this period</p></div>';return;}
-  let h=`<table class="tbl"><thead><tr><th>Date</th><th>TID</th><th>Batch</th><th>Particulars</th><th>Debit</th><th>Credit</th><th>Status</th></tr></thead><tbody>`;
-  combined.forEach(e=>{
-    const isD=e.type==='debit';
-    const verified=isD&&creditedMap[e.id];
-    const statusCell=isD
-      ?(verified?'<span style="color:#059669;font-weight:700;font-size:11px;">✅ Credited</span>':'<span style="color:#F59E0B;font-weight:700;font-size:11px;">⏳ Pending</span>')
-      :'—';
+  if(!sorted.length){tbl.innerHTML='<div class="empty"><div class="ico">📊</div><p>No data for this period</p></div>';renderTidSummary('rep-tid-summary',[]);return;}
+  let h=`<table class="tbl"><thead><tr><th>Date</th><th>TID</th><th>Batch</th><th>Amount</th><th>Status</th></tr></thead><tbody>`;
+  sorted.forEach(t=>{
+    const v=creditedMap[t.id];
+    const statusCell=v?'<span style="color:#059669;font-weight:700;font-size:11px;">✅ Verified</span>':'<span style="color:#F59E0B;font-weight:700;font-size:11px;">⏳ Pending</span>';
     h+=`<tr>
-      <td style="white-space:nowrap;">${fmtDate(e.date)}</td>
-      <td style="font-family:'Roboto Mono',monospace;font-size:11px;">${e.tid||'—'}</td>
-      <td style="font-family:'Roboto Mono',monospace;font-weight:700;">#${e.batch}</td>
-      <td style="font-weight:600;">${e.customer||'Fleet Card'}</td>
-      <td style="font-family:'Roboto Mono',monospace;color:var(--red);font-weight:700;">${isD?fmtAmt(e.amount):'—'}</td>
-      <td style="font-family:'Roboto Mono',monospace;color:var(--green);font-weight:700;">${!isD?fmtAmt(e.amount):'—'}</td>
+      <td style="white-space:nowrap;">${fmtDate(t.date)}</td>
+      <td style="font-family:'Roboto Mono',monospace;font-size:11px;">${t.tid||'—'}</td>
+      <td style="font-family:'Roboto Mono',monospace;font-weight:700;">#${t.batch}</td>
+      <td style="font-family:'Roboto Mono',monospace;font-weight:700;">${fmtAmt(t.amount)}</td>
       <td>${statusCell}</td>
     </tr>`;
   });
-  h+=`</tbody><tfoot><tr><td colspan="4">TOTAL</td><td style="font-family:'Roboto Mono',monospace;">${fmtAmt(totalDr)}</td><td style="font-family:'Roboto Mono',monospace;">${fmtAmt(totalCr)}</td><td></td></tr></tfoot></table>`;
+  h+=`</tbody><tfoot><tr><td colspan="3">TOTAL</td><td style="font-family:'Roboto Mono',monospace;">${fmtAmt(totalAmt)}</td><td></td></tr></tfoot></table>`;
   tbl.innerHTML=h;
+
+  renderTidSummary('rep-tid-summary',txns);
 }
 
 // ── LEDGER ─────────────────────────────────────────────────────────────────
@@ -1381,97 +1415,44 @@ function generateLedger(){
   const from=document.getElementById('led-from').value;
   const to=document.getElementById('led-to').value;
   const tid=document.getElementById('led-tid').value;
-  const cust=document.getElementById('led-cust').value;
   if(!from||!to)return toast('Select date range','err');
   if(from>to)return toast('From date must be before To date','err');
 
   let txns=db.transactions.filter(t=>t.date>=from&&t.date<=to);
-  let recv=db.received.filter(r=>r.date>=from&&r.date<=to);
   if(tid!=='ALL')txns=txns.filter(t=>t.tid===tid);
+  txns=[...txns].sort((a,b)=>a.date.localeCompare(b.date)||(a.createdAt||'').localeCompare(b.createdAt||''));
 
-  if(cust==='Fleet Card'){
-    txns=txns.filter(t=>t.customer==='Fleet Card'||!t.customer);
-    recv=recv.filter(r=>r.customer==='Fleet Card'||!r.customer);
-  } else if(cust==='ALL_CUSTOMERS'){
-    txns=txns.filter(t=>t.customer&&t.customer!=='Fleet Card');
-    recv=recv.filter(r=>r.customer&&r.customer!=='Fleet Card');
-  } else if(cust!=='ALL'){
-    txns=txns.filter(t=>(t.customer||'').trim()===cust.trim());
-    recv=recv.filter(r=>(r.customer||'').trim()===cust.trim());
-  }
+  const verifiedTxns=txns.filter(t=>creditedMap[t.id]);
+  const pendingTxns=txns.filter(t=>!creditedMap[t.id]);
+  const verifiedAmt=verifiedTxns.reduce((s,t)=>s+t.amount,0);
+  const pendingAmt=pendingTxns.reduce((s,t)=>s+t.amount,0);
 
-  const isFleetCardView=(cust==='Fleet Card');
-  // Determine which FY the date range falls in (use from date)
-  const ledgerFY=dateToFY(from)||activeFY;
-  const ob=isFleetCardView?(db.fyOpeningBalances[ledgerFY]||0):0;
-
-  const combined=[
-    ...txns.map(t=>({...t,type:'debit'})),
-    ...recv.map(r=>({...r,type:'credit'}))
-  ].sort((a,b)=>a.date.localeCompare(b.date)||(a.createdAt||a.savedAt||'').localeCompare(b.createdAt||b.savedAt||''));
-
-  let bal=ob;
-  const totalDr=txns.reduce((s,t)=>s+t.amount,0);
-  const totalCr=recv.reduce((s,r)=>s+r.amount,0);
-  const closingBal=ob+totalCr-totalDr;
-
-  const obLabel=document.querySelector('#ledger-output .bal-item:first-child .bal-lbl');
-  if(obLabel)obLabel.textContent=isFleetCardView?'Opening Balance':'Opening Bal (N/A)';
-  document.getElementById('led-ob').textContent=isFleetCardView?fmtAmt(ob):'—';
-  const cbEl=document.getElementById('led-cb');
-  cbEl.textContent=fmtAmt(Math.abs(closingBal))+(closingBal<0?' (Dr)':closingBal>0?' (Cr)':'');
-  cbEl.className='bal-val '+(closingBal<0?'neg':closingBal>0?'pos':'zero');
-  const net=totalCr-totalDr;
-  const netEl=document.getElementById('led-net');
-  netEl.textContent=fmtAmt(Math.abs(net))+(net<0?' Dr':net>0?' Cr':'');
-  netEl.className='bal-val '+(net<0?'neg':net>0?'pos':'zero');
+  document.getElementById('led-total').textContent=txns.length;
+  document.getElementById('led-verified').textContent=fmtAmt(verifiedAmt);
+  document.getElementById('led-pending').textContent=fmtAmt(pendingAmt);
 
   let rows='';
-  if(isFleetCardView){
-    rows=`<div class="ledger-row opening">
-      <span class="lr-date"></span>
-      <span class="lr-particulars" style="grid-column:1/4;font-weight:700;color:var(--navy);">OPENING BALANCE</span>
-      <span></span>
-      <span class="lr-balance" style="color:var(--blue);">${fmtAmt(ob)}</span>
+  if(!txns.length){
+    rows='<div class="empty"><div class="ico">📒</div><p>No entries for this period</p></div>';
+  } else {
+    txns.forEach(t=>{
+      const v=creditedMap[t.id];
+      const statusHtml=v?'<span style="color:var(--green);font-weight:700;">✅ Verified</span>':'<span style="color:var(--accent);font-weight:700;">⏳ Pending</span>';
+      rows+=`<div class="ledger-row" style="grid-template-columns:90px 90px 1fr 130px;">
+        <span class="lr-date">${fmtDate(t.date)}</span>
+        <span class="lr-batch">${t.tid||'—'}</span>
+        <span class="lr-particulars">#${t.batch} · ${fmtAmt(t.amount)}</span>
+        <span style="text-align:right;">${statusHtml}</span>
+      </div>`;
+    });
+    rows+=`<div class="ledger-row total-row" style="grid-template-columns:90px 90px 1fr 130px;">
+      <span></span><span></span><span>TOTAL — ${txns.length} entries</span>
+      <span style="text-align:right;">${fmtAmt(verifiedAmt+pendingAmt)}</span>
     </div>`;
   }
 
-  combined.forEach(e=>{
-    const isD=e.type==='debit';
-    if(isD)bal-=e.amount; else bal+=e.amount;
-    const balColor=bal<0?'color:var(--red);':bal===0?'':'color:var(--navy);';
-    rows+=`<div class="ledger-row">
-      <span class="lr-date">${fmtDate(e.date)}</span>
-      <span style="display:flex;flex-direction:column;gap:2px;">
-        <span class="lr-particulars">${e.customer||'Fleet Card'}</span>
-        <span class="lr-batch">${e.tid||''} · #${e.batch}</span>
-      </span>
-      <span class="lr-debit">${isD?fmtAmt(e.amount):'—'}</span>
-      <span class="lr-credit">${!isD?fmtAmt(e.amount):'—'}</span>
-      <span class="lr-balance" style="${balColor}">${fmtAmt(Math.abs(bal))}${bal<0?' Dr':bal>0?' Cr':''}</span>
-    </div>`;
-  });
-
-  rows+=`<div class="ledger-row subtotal">
-    <span></span><span style="font-weight:700;color:var(--navy);">SUB TOTAL</span>
-    <span class="lr-debit">${fmtAmt(totalDr)}</span>
-    <span class="lr-credit">${fmtAmt(totalCr)}</span>
-    <span></span>
-  </div>
-  <div class="ledger-row total-row">
-    <span></span><span>TOTAL</span>
-    <span class="lr-debit" style="color:#FCA5A5;">${fmtAmt(Math.max(totalDr,totalCr))}</span>
-    <span class="lr-credit" style="color:#6EE7B7;">${fmtAmt(Math.max(totalDr,totalCr))}</span>
-    <span></span>
-  </div>
-  <div class="ledger-row closing">
-    <span></span>
-    <span style="font-weight:800;">CLOSING BALANCE</span>
-    <span></span><span></span>
-    <span class="lr-balance" style="${closingBal<0?'color:#FCA5A5;':closingBal>0?'color:#6EE7B7;':'color:#fff;'}">${fmtAmt(Math.abs(closingBal))}${closingBal<0?' Dr':closingBal>0?' Cr':''}</span>
-  </div>`;
-
   document.getElementById('ledger-rows').innerHTML=rows;
+  renderTidSummary('ledger-tid-summary',txns);
   document.getElementById('ledger-output').style.display='block';
   document.getElementById('ledger-output').scrollIntoView({behavior:'smooth'});
   toast('Ledger generated ✓');
@@ -1542,66 +1523,101 @@ function scheduleDailyExcel(){
 }
 
 // ── EXPORT EXCEL ───────────────────────────────────────────────────────────
+function buildTidSummaryRows(txns){
+  const map={};
+  txns.forEach(t=>{
+    const tid=t.tid||'—';
+    if(!map[tid])map[tid]={count:0,total:0,verified:0,pending:0};
+    map[tid].count++;map[tid].total+=t.amount;
+    if(creditedMap[t.id])map[tid].verified+=t.amount;else map[tid].pending+=t.amount;
+  });
+  const rows=[['TID','Entries','Total (₹)','Verified (₹)','Pending (₹)']];
+  let gCount=0,gTotal=0,gVerified=0,gPending=0;
+  Object.keys(map).sort().forEach(tid=>{
+    const d=map[tid];
+    gCount+=d.count;gTotal+=d.total;gVerified+=d.verified;gPending+=d.pending;
+    rows.push([tid,d.count,d.total,d.verified,d.pending]);
+  });
+  rows.push([]);rows.push(['TOTAL',gCount,gTotal,gVerified,gPending]);
+  return rows;
+}
+
 function exportExcel(){
-  const {txns,recv}=getFilteredEntries();
-  if(!txns.length&&!recv.length)return toast('No data','err');
-  const combined=[...txns.map(t=>({...t,type:'debit'})),...recv.map(r=>({...r,type:'credit'}))].sort((a,b)=>a.date.localeCompare(b.date));
-  const data=[['Date','TID','Batch #','Particulars','Debit (₹)','Credit (₹)']];
-  combined.forEach(e=>{data.push([fmtDate(e.date),e.tid||'—','#'+e.batch,e.customer||'Fleet Card',e.type==='debit'?e.amount:'',e.type==='credit'?e.amount:'']);});
-  const totalDr=txns.reduce((s,t)=>s+t.amount,0),totalCr=recv.reduce((s,r)=>s+r.amount,0);
-  data.push([]);data.push(['TOTAL','','','',totalDr,totalCr]);
+  const {txns}=getFilteredEntries();
+  if(!txns.length)return toast('No data','err');
+  const sorted=[...txns].sort((a,b)=>a.date.localeCompare(b.date));
+  const data=[['Date','TID','Batch #','Amount (₹)','Status']];
+  let totalAmt=0;
+  sorted.forEach(t=>{
+    totalAmt+=t.amount;
+    data.push([fmtDate(t.date),t.tid||'—','#'+t.batch,t.amount,creditedMap[t.id]?'Verified':'Pending']);
+  });
+  data.push([]);data.push(['TOTAL','','',totalAmt,'']);
   const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=[12,14,10,22,14,14].map(w=>({wch:w}));
+  const ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=[12,14,10,14,14].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb,ws,'Report');
+  const tidWs=XLSX.utils.aoa_to_sheet(buildTidSummaryRows(sorted));
+  tidWs['!cols']=[14,10,14,14,14].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb,tidWs,'TID Summary');
   XLSX.writeFile(wb,`FleetCard_Report_${activeFY}_${todayStr()}.xlsx`);
   toast('Excel downloaded!');
 }
 
 function exportLedgerExcel(){
   const from=document.getElementById('led-from').value,to=document.getElementById('led-to').value;
-  const tid=document.getElementById('led-tid').value,cust=document.getElementById('led-cust').value;
+  const tid=document.getElementById('led-tid').value;
   let txns=db.transactions.filter(t=>t.date>=from&&t.date<=to);
-  let recv=db.received.filter(r=>r.date>=from&&r.date<=to);
   if(tid!=='ALL')txns=txns.filter(t=>t.tid===tid);
-  const isFC=(cust==='Fleet Card');
-  if(cust==='Fleet Card'){txns=txns.filter(t=>t.customer==='Fleet Card'||!t.customer);recv=recv.filter(r=>r.customer==='Fleet Card'||!r.customer);}
-  else if(cust==='ALL_CUSTOMERS'){txns=txns.filter(t=>t.customer&&t.customer!=='Fleet Card');recv=recv.filter(r=>r.customer&&r.customer!=='Fleet Card');}
-  else if(cust!=='ALL'){txns=txns.filter(t=>(t.customer||'').trim()===cust.trim());recv=recv.filter(r=>(r.customer||'').trim()===cust.trim());}
-  const combined=[...txns.map(t=>({...t,type:'debit'})),...recv.map(r=>({...r,type:'credit'}))].sort((a,b)=>a.date.localeCompare(b.date));
-  const ledgerFY=dateToFY(from)||activeFY;
-  const ob=isFC?(db.fyOpeningBalances[ledgerFY]||0):0;let bal=ob;
-  const data=[['Date','TID','Batch #','Particulars','Debit (₹)','Credit (₹)','Balance (₹)']];
-  if(isFC)data.push(['','','','OPENING BALANCE','','',ob]);
-  combined.forEach(e=>{
-    const isD=e.type==='debit';
-    if(isD)bal-=e.amount;else bal+=e.amount;
-    data.push([fmtDate(e.date),e.tid||'—','#'+e.batch,e.customer||'Fleet Card',isD?e.amount:'',!isD?e.amount:'',bal]);
+  txns=[...txns].sort((a,b)=>a.date.localeCompare(b.date));
+  const data=[['Date','TID','Batch #','Amount (₹)','Status']];
+  let totalAmt=0;
+  txns.forEach(t=>{
+    totalAmt+=t.amount;
+    data.push([fmtDate(t.date),t.tid||'—','#'+t.batch,t.amount,creditedMap[t.id]?'Verified':'Pending']);
   });
-  const totalDr=txns.reduce((s,t)=>s+t.amount,0),totalCr=recv.reduce((s,r)=>s+r.amount,0);
-  data.push([]);data.push(['SUB TOTAL','','','',totalDr,totalCr,'']);
-  data.push(['CLOSING BALANCE','','','','','',ob+totalCr-totalDr]);
+  data.push([]);data.push(['TOTAL','','',totalAmt,'']);
   const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=[12,14,10,22,14,14,14].map(w=>({wch:w}));
+  const ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=[12,14,10,14,14].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb,ws,'Ledger');
+  const tidWs=XLSX.utils.aoa_to_sheet(buildTidSummaryRows(txns));
+  tidWs['!cols']=[14,10,14,14,14].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb,tidWs,'TID Summary');
   XLSX.writeFile(wb,`FleetCard_Ledger_${from}_to_${to}.xlsx`);
   toast('Ledger Excel downloaded!');
 }
 
 // ── EXPORT PDF ─────────────────────────────────────────────────────────────
-function exportPDF(){
-  const {txns,recv}=getFilteredEntries();
-  if(!txns.length&&!recv.length)return toast('No data','err');
-  const combined=[...txns.map(t=>({...t,type:'debit'})),...recv.map(r=>({...r,type:'credit'}))].sort((a,b)=>a.date.localeCompare(b.date));
-  const totalDr=txns.reduce((s,t)=>s+t.amount,0),totalCr=recv.reduce((s,r)=>s+r.amount,0);
-  const custFilter=document.getElementById('rep-cust').value;
-  const isFC=(custFilter==='Fleet Card');
-  const ob=isFC?getOB():0;
-  const bal=ob+totalCr-totalDr;
-  let rows='';combined.forEach(e=>{
-    const isD=e.type==='debit';
-    rows+=`<tr><td>${fmtDate(e.date)}</td><td>${e.tid||'—'}</td><td>#${e.batch}</td><td>${e.customer||'Fleet Card'}</td><td style="color:#DC2626;font-family:monospace;font-weight:700;">${isD?'₹'+e.amount.toLocaleString('en-IN',{minimumFractionDigits:2}):''}</td><td style="color:#059669;font-family:monospace;font-weight:700;">${!isD?'₹'+e.amount.toLocaleString('en-IN',{minimumFractionDigits:2}):''}</td></tr>`;
+function buildTidSummaryHTML(txns){
+  const map={};
+  txns.forEach(t=>{
+    const tid=t.tid||'—';
+    if(!map[tid])map[tid]={count:0,total:0,verified:0,pending:0};
+    map[tid].count++;map[tid].total+=t.amount;
+    if(creditedMap[t.id])map[tid].verified+=t.amount;else map[tid].pending+=t.amount;
   });
-  const particularsLabel=custFilter==='ALL'?'All':custFilter==='ALL_CUSTOMERS'?'All Customers':custFilter;
+  const tids=Object.keys(map).sort();
+  let gCount=0,gTotal=0,gVerified=0,gPending=0;
+  let rows=tids.map(tid=>{
+    const d=map[tid];gCount+=d.count;gTotal+=d.total;gVerified+=d.verified;gPending+=d.pending;
+    return`<tr><td>${tid}</td><td>${d.count}</td><td style="font-family:monospace;">₹${d.total.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;color:#059669;">₹${d.verified.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;color:#EA580C;">₹${d.pending.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>`;
+  }).join('');
+  return`<h2 style="font-size:14px;margin:18px 0 8px;">🔢 TID-wise Summary</h2>
+  <table><thead><tr><th>TID</th><th>Entries</th><th>Total</th><th>Verified</th><th>Pending</th></tr></thead>
+  <tbody>${rows}</tbody>
+  <tfoot><tr><td>TOTAL</td><td>${gCount}</td><td style="font-family:monospace;">₹${gTotal.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;">₹${gVerified.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;">₹${gPending.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr></tfoot></table>`;
+}
+
+function exportPDF(){
+  const {txns}=getFilteredEntries();
+  if(!txns.length)return toast('No data','err');
+  const sorted=[...txns].sort((a,b)=>a.date.localeCompare(b.date));
+  const verifiedAmt=sorted.filter(t=>creditedMap[t.id]).reduce((s,t)=>s+t.amount,0);
+  const pendingAmt=sorted.filter(t=>!creditedMap[t.id]).reduce((s,t)=>s+t.amount,0);
+  const totalAmt=verifiedAmt+pendingAmt;
+  let rows='';sorted.forEach(t=>{
+    const v=creditedMap[t.id];
+    rows+=`<tr><td>${fmtDate(t.date)}</td><td>${t.tid||'—'}</td><td>#${t.batch}</td><td style="font-family:monospace;font-weight:700;">₹${t.amount.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="color:${v?'#059669':'#EA580C'};font-weight:700;">${v?'✅ Verified':'⏳ Pending'}</td></tr>`;
+  });
   const _frHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fleet Card Report</title>
   <style>body{font-family:Arial,sans-serif;font-size:12px;padding:24px;}h1{font-size:18px;margin-bottom:4px;}
   .meta{color:#888;font-size:11px;margin-bottom:14px;}.summary{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
@@ -1613,17 +1629,18 @@ function exportPDF(){
   .btn{background:#0369A1;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:700;margin:8px 8px 8px 0;}
   .btn-back{background:#6B7280!important;}.btn-wrap{margin-bottom:16px;}@media print{.btn-wrap{display:none;}}</style></head><body>
   <div class="btn-wrap"><button class="btn btn-back" onclick="window.close()">← Back to App</button><button class="btn" onclick="window.print()">🖨 Print / Save PDF</button></div>
-  <h1>⛽ FLEET CARD REPORT — ${particularsLabel} · ${fyLabel(activeFY)}</h1>
+  <h1>⛽ FLEET CARD REPORT · ${fyLabel(activeFY)}</h1>
   <div class="meta">Generated: ${new Date().toLocaleString('en-IN')}</div>
   <div class="summary">
-    <div class="sbox"><div class="sval" style="color:#DC2626;">₹${totalDr.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Debit</div></div>
-    <div class="sbox"><div class="sval" style="color:#059669;">₹${totalCr.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Credit</div></div>
-    ${isFC?`<div class="sbox"><div class="sval" style="color:#0369A1;">₹${ob.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Opening Bal</div></div>`:''}
-    <div class="sbox"><div class="sval" style="color:${bal<0?'#DC2626':bal>0?'#059669':'#333'};">₹${Math.abs(bal).toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Balance${bal<0?' (Dr)':bal>0?' (Cr)':''}</div></div>
+    <div class="sbox"><div class="sval" style="color:#0369A1;">₹${totalAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Amount</div></div>
+    <div class="sbox"><div class="sval" style="color:#059669;">₹${verifiedAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Verified</div></div>
+    <div class="sbox"><div class="sval" style="color:#EA580C;">₹${pendingAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Pending</div></div>
+    <div class="sbox"><div class="sval" style="color:#333;">${sorted.length}</div><div class="slbl">Entries</div></div>
   </div>
-  <table><thead><tr><th>Date</th><th>TID</th><th>Batch #</th><th>Particulars</th><th>Debit</th><th>Credit</th></tr></thead>
+  <table><thead><tr><th>Date</th><th>TID</th><th>Batch #</th><th>Amount</th><th>Status</th></tr></thead>
   <tbody>${rows}</tbody>
-  <tfoot><tr><td colspan="4">TOTAL</td><td style="font-family:monospace;">₹${totalDr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;">₹${totalCr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr></tfoot></table>
+  <tfoot><tr><td colspan="3">TOTAL</td><td style="font-family:monospace;">₹${totalAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td></td></tr></tfoot></table>
+  ${buildTidSummaryHTML(sorted)}
   </body></html>`;
   window.open(URL.createObjectURL(new Blob([_frHtml],{type:'text/html;charset=utf-8'})),'_blank');
   toast('Report opened — use ← Back to return');
@@ -1632,38 +1649,29 @@ function exportPDF(){
 function buildLedgerHTML(compact){
   const from=document.getElementById('led-from').value,to=document.getElementById('led-to').value;
   if(!from||!to){toast('Select date range first','err');return null;}
-  const tid=document.getElementById('led-tid').value,cust=document.getElementById('led-cust').value;
+  const tid=document.getElementById('led-tid').value;
   let txns=db.transactions.filter(t=>t.date>=from&&t.date<=to);
-  let recv=db.received.filter(r=>r.date>=from&&r.date<=to);
   if(tid!=='ALL')txns=txns.filter(t=>t.tid===tid);
-  const isFC=(cust==='Fleet Card');
-  if(cust==='Fleet Card'){txns=txns.filter(t=>t.customer==='Fleet Card'||!t.customer);recv=recv.filter(r=>r.customer==='Fleet Card'||!r.customer);}
-  else if(cust==='ALL_CUSTOMERS'){txns=txns.filter(t=>t.customer&&t.customer!=='Fleet Card');recv=recv.filter(r=>r.customer&&r.customer!=='Fleet Card');}
-  else if(cust!=='ALL'){txns=txns.filter(t=>(t.customer||'').trim()===cust.trim());recv=recv.filter(r=>(r.customer||'').trim()===cust.trim());}
-  const combined=[...txns.map(t=>({...t,type:'debit'})),...recv.map(r=>({...r,type:'credit'}))].sort((a,b)=>a.date.localeCompare(b.date));
+  txns=[...txns].sort((a,b)=>a.date.localeCompare(b.date));
   const ledgerFY=dateToFY(from)||activeFY;
-  const ob=isFC?(db.fyOpeningBalances[ledgerFY]||0):0;let bal=ob;
-  const totalDr=txns.reduce((s,t)=>s+t.amount,0),totalCr=recv.reduce((s,r)=>s+r.amount,0);
-  const cb=ob+totalCr-totalDr;
-  const particularsLabel=cust==='ALL'?'All':cust==='ALL_CUSTOMERS'?'All Customers':cust;
+  const verifiedAmt=txns.filter(t=>creditedMap[t.id]).reduce((s,t)=>s+t.amount,0);
+  const pendingAmt=txns.filter(t=>!creditedMap[t.id]).reduce((s,t)=>s+t.amount,0);
+  const totalAmt=verifiedAmt+pendingAmt;
   // compact: smaller font, tighter rows, landscape
   const fs=compact?'8px':'12px', pad=compact?'3px 5px':'8px 10px', hpad=compact?'4px 5px':'8px 10px';
   let rows='';
-  if(isFC){rows=`<tr style="background:#EFF6FF;"><td colspan="4" style="font-weight:700;">OPENING BALANCE</td><td></td><td></td><td style="font-family:monospace;font-weight:700;color:#0369A1;">₹${ob.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>`;}
-  combined.forEach(e=>{
-    const isD=e.type==='debit';
-    if(isD)bal-=e.amount;else bal+=e.amount;
-    const bc=bal<0?'#DC2626':bal>0?'#0C3547':'#888';
-    rows+=`<tr><td>${fmtDate(e.date)}</td><td>${e.customer||'Fleet Card'}</td><td>${e.tid||'—'}</td><td>#${e.batch}</td><td style="color:#DC2626;font-family:monospace;font-weight:700;text-align:right;">${isD?'₹'+e.amount.toLocaleString('en-IN',{minimumFractionDigits:2}):''}</td><td style="color:#059669;font-family:monospace;font-weight:700;text-align:right;">${!isD?'₹'+e.amount.toLocaleString('en-IN',{minimumFractionDigits:2}):''}</td><td style="font-family:monospace;font-weight:700;color:${bc};text-align:right;">₹${Math.abs(bal).toLocaleString('en-IN',{minimumFractionDigits:2})}${bal<0?' Dr':bal>0?' Cr':''}</td></tr>`;
+  txns.forEach(t=>{
+    const v=creditedMap[t.id];
+    rows+=`<tr><td>${fmtDate(t.date)}</td><td>${t.tid||'—'}</td><td>#${t.batch}</td><td style="font-family:monospace;font-weight:700;text-align:right;">₹${t.amount.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="color:${v?'#059669':'#EA580C'};font-weight:700;text-align:right;">${v?'✅ Verified':'⏳ Pending'}</td></tr>`;
   });
-  rows+=`<tr style="background:#F5FAFE;font-weight:700;"><td colspan="4">SUB TOTAL</td><td style="font-family:monospace;color:#DC2626;text-align:right;">₹${totalDr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;color:#059669;text-align:right;">₹${totalCr.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td></td></tr>
-  <tr style="background:#0C3547;color:#fff;font-weight:800;"><td colspan="6">CLOSING BALANCE</td><td style="font-family:monospace;color:${cb<0?'#FCA5A5':cb>0?'#6EE7B7':'#fff'};text-align:right;">₹${Math.abs(cb).toLocaleString('en-IN',{minimumFractionDigits:2})} ${cb<0?'Dr':cb>0?'Cr':''}</td></tr>`;
+  rows+=`<tr style="background:#F5FAFE;font-weight:700;"><td colspan="3">TOTAL — ${txns.length} entries</td><td style="font-family:monospace;text-align:right;">₹${totalAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td></td></tr>`;
   return {html:`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fleet Card Ledger</title>
   <style>
   ${compact?'@page{size:A4 landscape;margin:8mm;}':'@page{size:A4 portrait;margin:12mm;}'}
   *{box-sizing:border-box;}
   body{font-family:Arial,sans-serif;font-size:${fs};padding:${compact?'6px':'16px'};}
   h1{font-size:${compact?'11px':'16px'};margin-bottom:2px;font-weight:800;}
+  h2{font-size:${compact?'10px':'13px'};margin:14px 0 6px;}
   .meta{color:#888;font-size:${compact?'7px':'10px'};margin-bottom:${compact?'5px':'10px'};}
   .summary{display:flex;gap:6px;margin-bottom:${compact?'6px':'12px'};}
   .sbox{background:#F5FAFE;border:1px solid #D1E4EE;border-radius:4px;padding:${compact?'4px 6px':'8px 12px'};flex:1;text-align:center;}
@@ -1677,16 +1685,16 @@ function buildLedgerHTML(compact){
   .no-print.sec{background:#059669;}
   @media print{.no-print{display:none;}}
   </style></head><body>
-  <h1>⛽ FLEET CARD LEDGER · ${particularsLabel} · ${fyLabel(ledgerFY)}</h1>
-  <div class="meta">Period: ${fmtDate(from)} to ${fmtDate(to)} · ${combined.length} entries · Generated: ${new Date().toLocaleString('en-IN')}</div>
+  <h1>⛽ FLEET CARD LEDGER · ${fyLabel(ledgerFY)}</h1>
+  <div class="meta">Period: ${fmtDate(from)} to ${fmtDate(to)} · ${txns.length} entries · Generated: ${new Date().toLocaleString('en-IN')}</div>
   <div class="summary">
-    ${isFC?`<div class="sbox"><div class="sval" style="color:#0369A1;">₹${ob.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Opening Bal</div></div>`:''}
-    <div class="sbox"><div class="sval" style="color:#DC2626;">₹${totalDr.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Debit</div></div>
-    <div class="sbox"><div class="sval" style="color:#059669;">₹${totalCr.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Total Credit</div></div>
-    <div class="sbox"><div class="sval" style="color:${cb<0?'#DC2626':cb>0?'#059669':'#333'};">₹${Math.abs(cb).toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Closing Bal</div></div>
+    <div class="sbox"><div class="sval" style="color:#333;">${txns.length}</div><div class="slbl">Entries</div></div>
+    <div class="sbox"><div class="sval" style="color:#059669;">₹${verifiedAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Verified</div></div>
+    <div class="sbox"><div class="sval" style="color:#EA580C;">₹${pendingAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</div><div class="slbl">Pending</div></div>
   </div>
-  <table><thead><tr><th>Date</th><th>Particulars</th><th>TID</th><th>Batch#</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th style="text-align:right">Balance</th></tr></thead>
+  <table><thead><tr><th>Date</th><th>TID</th><th>Batch#</th><th style="text-align:right">Amount</th><th style="text-align:right">Status</th></tr></thead>
   <tbody>${rows}</tbody></table>
+  ${buildTidSummaryHTML(txns)}
   <div class="no-print" style="margin-top:10px;">
     <button class="no-print" onclick="window.print()">🖨 Print / Save PDF</button>
     <button class="no-print sec" onclick="switchCompact()">⇄ Toggle Compact/Normal</button>
@@ -1698,7 +1706,7 @@ function buildLedgerHTML(compact){
       window.close();
     }
   <\/script>
-  </body></html>`, rows:combined.length};
+  </body></html>`, rows:txns.length};
 }
 
 function exportLedgerPDF(compact){
