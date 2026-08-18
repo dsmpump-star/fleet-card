@@ -111,9 +111,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .export-row .btn{flex:1;padding:12px;font-size:13px;}
 .ledger-wrap{background:var(--card);border-radius:15px;border:1px solid var(--border);overflow:hidden;margin-bottom:14px;}
 .ledger-hdr{background:var(--navy);color:#fff;padding:0;}
-.ledger-hdr-row{display:grid;grid-template-columns:90px 1fr 100px 100px 100px;padding:10px 12px;}
+.ledger-hdr-row{display:grid;grid-template-columns:90px 1fr 100px 100px 100px;padding:8px 6px;}
 .ledger-hdr-row span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:rgba(255,255,255,.7);}
-.ledger-row{display:grid;grid-template-columns:90px 1fr 100px 100px 100px;padding:9px 12px;border-bottom:1px solid var(--border);font-size:12px;}
+.ledger-row{display:grid;grid-template-columns:90px 1fr 100px 100px 100px;padding:8px 6px;border-bottom:1px solid var(--border);font-size:11px;}
 .ledger-row:last-child{border-bottom:none;}
 .ledger-row.opening{background:#F0F9FF;}
 .ledger-row.subtotal{background:#F5FAFE;font-weight:700;}
@@ -351,8 +351,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
     <div class="ledger-wrap">
       <div class="ledger-hdr">
-        <div class="ledger-hdr-row" style="grid-template-columns:85px 90px 65px 100px 110px;">
-          <span>Date</span><span>TID</span><span>Batch</span><span style="text-align:right">Amount</span><span style="text-align:right">Status</span>
+        <div class="ledger-hdr-row" style="grid-template-columns:52px 68px 44px 1fr 28px;column-gap:4px;">
+          <span>Date</span><span>TID</span><span>Batch</span><span style="text-align:right">Amount</span><span style="text-align:center">✓</span>
         </div>
       </div>
       <div id="ledger-rows"></div>
@@ -594,6 +594,11 @@ function fmtDate(d){
   if(s.includes('-')){const p=s.split('-');if(p.length===3)return`${p[2]}/${p[1]}/${p[0]}`;}
   try{const dt=new Date(d);if(!isNaN(dt.getTime()))return`${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;}catch{}
   return s;
+}
+function fmtDateShort(d){
+  const full=fmtDate(d);
+  const parts=full.split('/');
+  return parts.length===3?`${parts[0]}/${parts[1]}`:full;
 }
 function normalizeDate(d){
   if(!d)return'';const s=String(d);
@@ -1437,19 +1442,19 @@ function generateLedger(){
   } else {
     txns.forEach(t=>{
       const v=creditedMap[t.id];
-      const statusHtml=v?'<span style="color:var(--green);font-weight:700;">✅ Verified</span>':'<span style="color:var(--accent);font-weight:700;">⏳ Pending</span>';
-      rows+=`<div class="ledger-row" style="grid-template-columns:85px 90px 65px 100px 110px;">
-        <span class="lr-date">${fmtDate(t.date)}</span>
-        <span class="lr-batch">${t.tid||'—'}</span>
-        <span class="lr-batch">#${t.batch}</span>
-        <span class="lr-balance" style="text-align:right;">${fmtAmt(t.amount)}</span>
-        <span style="text-align:right;">${statusHtml}</span>
+      const statusHtml=v?'<span title="Verified" style="color:var(--green);font-weight:700;">✅</span>':'<span title="Pending" style="color:var(--accent);font-weight:700;">⏳</span>';
+      rows+=`<div class="ledger-row" style="grid-template-columns:52px 68px 44px 1fr 28px;column-gap:4px;">
+        <span class="lr-date" style="font-size:10px;">${fmtDateShort(t.date)}</span>
+        <span class="lr-batch" style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.tid||'—'}</span>
+        <span class="lr-batch" style="font-size:10px;">#${t.batch}</span>
+        <span class="lr-balance" style="text-align:right;font-size:11px;">${fmtAmt(t.amount)}</span>
+        <span style="text-align:center;">${statusHtml}</span>
       </div>`;
     });
-    rows+=`<div class="ledger-row total-row" style="grid-template-columns:85px 90px 65px 100px 110px;">
-      <span></span><span></span><span>TOTAL</span>
-      <span style="text-align:right;">${fmtAmt(verifiedAmt+pendingAmt)}</span>
-      <span style="text-align:right;font-size:11px;">${txns.length} entries</span>
+    rows+=`<div class="ledger-row total-row" style="grid-template-columns:52px 68px 44px 1fr 28px;column-gap:4px;">
+      <span></span><span></span><span style="font-size:10px;">Total</span>
+      <span style="text-align:right;font-size:11px;">${fmtAmt(verifiedAmt+pendingAmt)}</span>
+      <span></span>
     </div>`;
   }
 
