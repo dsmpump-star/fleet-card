@@ -351,8 +351,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
     <div class="ledger-wrap">
       <div class="ledger-hdr">
-        <div class="ledger-hdr-row" style="grid-template-columns:90px 90px 1fr 130px;">
-          <span>Date</span><span>TID</span><span>Batch / Amount</span><span style="text-align:right">Status</span>
+        <div class="ledger-hdr-row" style="grid-template-columns:85px 90px 65px 100px 110px;">
+          <span>Date</span><span>TID</span><span>Batch</span><span style="text-align:right">Amount</span><span style="text-align:right">Status</span>
         </div>
       </div>
       <div id="ledger-rows"></div>
@@ -1438,16 +1438,18 @@ function generateLedger(){
     txns.forEach(t=>{
       const v=creditedMap[t.id];
       const statusHtml=v?'<span style="color:var(--green);font-weight:700;">✅ Verified</span>':'<span style="color:var(--accent);font-weight:700;">⏳ Pending</span>';
-      rows+=`<div class="ledger-row" style="grid-template-columns:90px 90px 1fr 130px;">
+      rows+=`<div class="ledger-row" style="grid-template-columns:85px 90px 65px 100px 110px;">
         <span class="lr-date">${fmtDate(t.date)}</span>
         <span class="lr-batch">${t.tid||'—'}</span>
-        <span class="lr-particulars">#${t.batch} · ${fmtAmt(t.amount)}</span>
+        <span class="lr-batch">#${t.batch}</span>
+        <span class="lr-balance" style="text-align:right;">${fmtAmt(t.amount)}</span>
         <span style="text-align:right;">${statusHtml}</span>
       </div>`;
     });
-    rows+=`<div class="ledger-row total-row" style="grid-template-columns:90px 90px 1fr 130px;">
-      <span></span><span></span><span>TOTAL — ${txns.length} entries</span>
+    rows+=`<div class="ledger-row total-row" style="grid-template-columns:85px 90px 65px 100px 110px;">
+      <span></span><span></span><span>TOTAL</span>
       <span style="text-align:right;">${fmtAmt(verifiedAmt+pendingAmt)}</span>
+      <span style="text-align:right;font-size:11px;">${txns.length} entries</span>
     </div>`;
   }
 
@@ -1550,7 +1552,7 @@ function exportExcel(){
   let totalAmt=0;
   sorted.forEach(t=>{
     totalAmt+=t.amount;
-    data.push([fmtDate(t.date),t.tid||'—','#'+t.batch,t.amount,creditedMap[t.id]?'Verified':'Pending']);
+    data.push([fmtDate(t.date),t.tid||'—',Number(t.batch),t.amount,creditedMap[t.id]?'Verified':'Pending']);
   });
   data.push([]);data.push(['TOTAL','','',totalAmt,'']);
   const wb=XLSX.utils.book_new();
@@ -1573,7 +1575,7 @@ function exportLedgerExcel(){
   let totalAmt=0;
   txns.forEach(t=>{
     totalAmt+=t.amount;
-    data.push([fmtDate(t.date),t.tid||'—','#'+t.batch,t.amount,creditedMap[t.id]?'Verified':'Pending']);
+    data.push([fmtDate(t.date),t.tid||'—',Number(t.batch),t.amount,creditedMap[t.id]?'Verified':'Pending']);
   });
   data.push([]);data.push(['TOTAL','','',totalAmt,'']);
   const wb=XLSX.utils.book_new();
