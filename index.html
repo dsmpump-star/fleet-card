@@ -220,7 +220,11 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div><label>Batch No. <span style="font-size:10px;color:var(--green);font-weight:600;">(auto-filled)</span></label><input type="number" id="dsm-batch" placeholder="Auto from TID" min="1" style="background:#F0F9FF;border-color:#BAE6FD;"></div>
       <div><label>Date</label><input type="date" id="dsm-date"></div>
     </div>
-    <div class="form-row">
+    <div class="form-row" style="background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:10px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;">
+      <label for="dsm-blank" style="margin:0;font-size:12px;font-weight:700;color:#9A3412;text-transform:none;letter-spacing:0;cursor:pointer;">🚫 Blank Batch <span style="font-weight:500;color:var(--muted);">(no amount — just reserve this batch #)</span></label>
+      <input type="checkbox" id="dsm-blank" onchange="onBlankToggle()" style="width:20px;height:20px;flex-shrink:0;margin-left:10px;">
+    </div>
+    <div class="form-row" id="dsm-amount-row">
       <label>Debit Amount (₹)</label>
       <div class="big-wrap"><span class="big-sym">₹</span><input type="number" id="dsm-amount" class="big-input" placeholder="0.00" min="0" step="0.01"></div>
     </div>
@@ -233,7 +237,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <input type="hidden" id="dsm-stno">
     </div>
     <div class="form-row"><label>Remark <span style="font-size:10px;color:var(--muted);font-weight:500;">(slip ref / vehicle no. / optional)</span></label><input type="text" id="dsm-remark" placeholder="e.g. MH-12-AB-1234"></div>
-    <button class="btn btn-primary" onclick="saveDSM()">＋ Save Debit Entry</button>
+    <button class="btn btn-primary" id="dsm-save-btn" onclick="saveDSM()">＋ Save Debit Entry</button>
   </div>
   <div style="position:relative;margin-bottom:12px;">
     <input type="text" id="dsm-search" placeholder="🔍 Search batch no., amount, customer, remark..." oninput="refreshDSM()" style="width:100%;padding:10px 13px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Sans',sans-serif;font-size:13px;background:#fff;outline:none;">
@@ -579,8 +583,10 @@ let db={tids:[],customers:[],transactions:[],received:[],fyOpeningBalances:{},ac
 let activeFY=getCurrentFY();
 
 // FY-filtered views
-function fyTxns(){return db.transactions.filter(t=>inFY(t.date,activeFY));}
-function fyRecv(){return db.received.filter(r=>inFY(r.date,activeFY));}
+function isFleetCardTxn(t){return !t.customer||String(t.customer).trim()==='Fleet Card';}
+function fyTxns(){return db.transactions.filter(t=>inFY(t.date,activeFY)&&isFleetCardTxn(t));}
+function fyRealTxns(){return fyTxns().filter(t=>!isBlankTxn(t));}
+function fyRecv(){return db.received.filter(r=>inFY(r.date,activeFY)&&isFleetCardTxn(r));}
 function inFY(date,fy){const{from,to}=fyDates(fy);return date>=from&&date<=to;}
 function getOB(){return Number(db.fyOpeningBalances[activeFY]||0);}
 
@@ -969,6 +975,23 @@ function clearSTNOBadges(){
   if(h)h.value='';
   renderSTNOBadges();
 }
+const BLANK_TAG='[BLANK]';
+function isBlankTxn(t){return Number(t.amount||0)===0&&(t.remark||'').includes(BLANK_TAG);}
+function onBlankToggle(){
+  const blank=document.getElementById('dsm-blank').checked;
+  const amtRow=document.getElementById('dsm-amount-row');
+  const amtInput=document.getElementById('dsm-amount');
+  const saveBtn=document.getElementById('dsm-save-btn');
+  if(blank){
+    amtRow.style.display='none';
+    amtInput.value='';
+    saveBtn.textContent='🚫 Save Blank Batch';
+  } else {
+    amtRow.style.display='block';
+    saveBtn.textContent='＋ Save Debit Entry';
+  }
+}
+
 function onCustChange(){
   const cust=document.getElementById('dsm-cust').value;
   const amtInput=document.getElementById('dsm-amount');
@@ -989,6 +1012,7 @@ function onCustChange(){
 async function saveDSM(){
   const tid=document.getElementById('dsm-tid').value.trim();
   const customer='Fleet Card'; // Locked — customer entries moved to Customer Pouch app
+  const isBlank=document.getElementById('dsm-blank').checked;
   // Validate STNO for customer entries
   const stnoVal=document.getElementById('dsm-stno').value.trim();
   if(customer!=='Fleet Card'&&customer!=='NIL'){
@@ -1004,7 +1028,7 @@ async function saveDSM(){
   if(!tid)return toast('Select a TID — required','err');
   if(!batch)return toast('Enter batch number','err');
   if(!date)return toast('Select a date','err');
-  if(customer!=='NIL'&&(!amount||amount<=0))return toast('Enter a valid amount','err');
+  if(!isBlank&&customer!=='NIL'&&(!amount||amount<=0))return toast('Enter a valid amount','err');
   // Duplicate batch check for same TID
   if(db.transactions.some(t=>t.tid===tid&&String(t.batch)===String(batch))){
     if(!confirm(`⚠️ Batch #${batch} already exists for ${tid}. Are you sure this is not a duplicate?`))return;
@@ -1029,8 +1053,9 @@ Continue?`))return;
   }
   // Warn if date outside active FY
   if(!inFY(date,activeFY)){const{from,to}=fyDates(activeFY);if(!confirm(`Date ${fmtDate(date)} is outside ${fyLabel(activeFY)} (${fmtDate(from)}–${fmtDate(to)}). Save anyway?`))return;}
-  const remark=stnoPrefix+(document.getElementById('dsm-remark').value.trim());
-  const entryAmount=customer==='NIL'?0:(amount||0);
+  const userRemark=document.getElementById('dsm-remark').value.trim();
+  const remark=isBlank?(BLANK_TAG+(userRemark?' '+userRemark:'')):(stnoPrefix+userRemark);
+  const entryAmount=isBlank?0:(customer==='NIL'?0:(amount||0));
   const entry={id:uid(),tid,customer,batch,date,amount:entryAmount,remark,createdAt:new Date().toISOString()};
   db.transactions.push(entry);
   // ensure FY is tracked
@@ -1041,12 +1066,19 @@ Continue?`))return;
   document.getElementById('dsm-batch').value='';
   document.getElementById('dsm-remark').value='';
   document.getElementById('dsm-stno').value='';
+  document.getElementById('dsm-blank').checked=false;
+  onBlankToggle();
   clearSTNOBadges();
   onCustChange();
-  toast(`Saved ✓  ${customer}  Batch #${batch}  ${fmtAmt(amount)}`);
-  fleetLog('save', `Saved Batch #${batch} — ${customer} — ${fmtAmt(amount)}${stnoNums.length?' — STNO: '+stnoNums.join(' '):''}`);
+  if(isBlank){
+    toast(`Saved ✓  Blank Batch #${batch}  (${tid})`);
+    fleetLog('save', `Saved BLANK Batch #${batch} — ${tid} — no amount`);
+  } else {
+    toast(`Saved ✓  ${customer}  Batch #${batch}  ${fmtAmt(amount)}`);
+    fleetLog('save', `Saved Batch #${batch} — ${customer} — ${fmtAmt(amount)}${stnoNums.length?' — STNO: '+stnoNums.join(' '):''}`);
+  }
   refreshDSM();saveLocal();
-  sendPushNotification('Fleet Entry — Saved', `${customer}  Batch #${batch}  ${fmtAmt(amount)}`);
+  sendPushNotification('Fleet Entry — Saved', isBlank?`Blank Batch #${batch}  (${tid})`:`${customer}  Batch #${batch}  ${fmtAmt(amount)}`);
   {const r=await apiPost({action:'saveTransaction',data:entry});setSyncStatus(r.success?'ok':'err');}
 }
 
@@ -1091,12 +1123,13 @@ function refreshDSM(){updatePendingBadge();
 
 function txnHTML(t,showDel){
   const ts=t.createdAt?new Date(t.createdAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true}):'';
-  return`<div class="entry-item">
+  const blank=isBlankTxn(t);
+  return`<div class="entry-item"${blank?' style="opacity:.7;border-style:dashed;"':''}>
     <div class="entry-top">
       <div>
         <div class="e-main">${t.tid} · Batch #${t.batch}</div>
         <div class="e-sub">👤 ${t.customer||'Fleet Card'} · 📅 ${fmtDate(t.date)}${ts?' · 🕐 '+ts:''}</div>
-        ${(()=>{
+        ${blank?`<div style="font-size:11px;color:#9A3412;margin-top:2px;font-weight:700;">🚫 Blank Batch — no transaction${(t.remark||'').replace(BLANK_TAG,'').trim()?' · '+(t.remark||'').replace(BLANK_TAG,'').trim():''}</div>`:(()=>{
           const isISODate=t.remark&&/^\d{4}-\d{2}-\d{2}T/.test(t.remark.trim());
           const stnoRawMatch=!isISODate&&t.remark&&t.remark.match(/STNO:\s*([\d\s]+?)\s*[—\-–]/i);
           const sm=stnoRawMatch?{nums:stnoRawMatch[1].trim().split(/\s+/).filter(Boolean)}:null;
@@ -1105,7 +1138,7 @@ function txnHTML(t,showDel){
                + (rem?`<div style="font-size:11px;color:var(--muted);margin-top:2px;">📝 ${rem}</div>`:'');
         })()}
       </div>
-      <div><div class="e-amt debit">${fmtAmt(t.amount)}</div><div class="e-meta">Debit</div></div>
+      <div>${blank?'<div class="e-amt" style="color:#9A3412;">— No Entry —</div>':`<div class="e-amt debit">${fmtAmt(t.amount)}</div><div class="e-meta">Debit</div>`}</div>
     </div>
     <div class="entry-actions">
       <button class="btn btn-sm btn-edit" onclick="editTxn('${t.id}')">✏️ Edit</button>
@@ -1236,7 +1269,7 @@ async function unmarkCredited(txnId){
 }
 
 function updatePendingBadge(){
-  const allT=fyTxns();
+  const allT=fyRealTxns();
   const pending=allT.filter(t=>!creditedMap[t.id]).length;
   const badge=document.getElementById('pending-badge');
   if(!badge)return;
@@ -1245,7 +1278,7 @@ function updatePendingBadge(){
 }
 
 function refreshRecv(){
-  const allT=fyTxns();
+  const allT=fyRealTxns();
   const verifiedTxns=allT.filter(t=>creditedMap[t.id]);
   const pendingTxns=allT.filter(t=>!creditedMap[t.id]);
   const totalDr=allT.reduce((s,t)=>s+t.amount,0);
@@ -1326,13 +1359,13 @@ function getFilteredEntries(){
     }
     // 'all' — show all data across all FYs
     if(curFilter==='all'){
-      if(arr===txns)return[...db.transactions];
-      return[...db.received];
+      if(arr===txns)return db.transactions.filter(isFleetCardTxn);
+      return db.received.filter(isFleetCardTxn);
     }
     return arr;
   };
   // For 'all' we bypass FY filter
-  if(curFilter==='all'){txns=[...db.transactions];recv=[...db.received];}
+  if(curFilter==='all'){txns=db.transactions.filter(isFleetCardTxn);recv=db.received.filter(isFleetCardTxn);}
   txns=filterDate(txns,'date');recv=filterDate(recv,'date');
   const tid=document.getElementById('rep-tid').value;
   if(tid!=='ALL')txns=txns.filter(t=>t.tid===tid);
@@ -1356,36 +1389,39 @@ function renderTidSummary(containerId,txns){
   const map={};
   txns.forEach(t=>{
     const tid=t.tid||'—';
-    if(!map[tid])map[tid]={count:0,total:0,verified:0,pending:0,vCount:0,pCount:0};
+    if(!map[tid])map[tid]={count:0,total:0,verified:0,pending:0,blank:0};
     map[tid].count++;map[tid].total+=t.amount;
-    if(creditedMap[t.id]){map[tid].verified+=t.amount;map[tid].vCount++;}
-    else{map[tid].pending+=t.amount;map[tid].pCount++;}
+    if(isBlankTxn(t))map[tid].blank++;
+    else if(creditedMap[t.id])map[tid].verified+=t.amount;
+    else map[tid].pending+=t.amount;
   });
   const tids=Object.keys(map).sort();
   if(!tids.length){container.innerHTML='<div class="empty"><div class="ico">🔢</div><p>No data for this period</p></div>';return;}
-  let h=`<table class="tbl"><thead><tr><th>TID</th><th>Entries</th><th style="text-align:right">Total</th><th style="text-align:right">Verified</th><th style="text-align:right">Pending</th></tr></thead><tbody>`;
-  let gCount=0,gTotal=0,gVerified=0,gPending=0;
+  let h=`<table class="tbl"><thead><tr><th>TID</th><th>Entries</th><th style="text-align:right">Total</th><th style="text-align:right">Verified</th><th style="text-align:right">Pending</th><th style="text-align:right">Blank</th></tr></thead><tbody>`;
+  let gCount=0,gTotal=0,gVerified=0,gPending=0,gBlank=0;
   tids.forEach(tid=>{
     const d=map[tid];
-    gCount+=d.count;gTotal+=d.total;gVerified+=d.verified;gPending+=d.pending;
+    gCount+=d.count;gTotal+=d.total;gVerified+=d.verified;gPending+=d.pending;gBlank+=d.blank;
     h+=`<tr>
       <td style="font-family:'Roboto Mono',monospace;font-weight:700;">${tid}</td>
       <td>${d.count}</td>
       <td style="font-family:'Roboto Mono',monospace;text-align:right;font-weight:700;">${fmtAmt(d.total)}</td>
       <td style="font-family:'Roboto Mono',monospace;text-align:right;color:var(--green);font-weight:700;">${fmtAmt(d.verified)}</td>
       <td style="font-family:'Roboto Mono',monospace;text-align:right;color:var(--orange);font-weight:700;">${fmtAmt(d.pending)}</td>
+      <td style="text-align:right;color:#9A3412;font-weight:700;">${d.blank||''}</td>
     </tr>`;
   });
-  h+=`</tbody><tfoot><tr><td>TOTAL</td><td>${gCount}</td><td style="font-family:'Roboto Mono',monospace;text-align:right;">${fmtAmt(gTotal)}</td><td style="font-family:'Roboto Mono',monospace;text-align:right;">${fmtAmt(gVerified)}</td><td style="font-family:'Roboto Mono',monospace;text-align:right;">${fmtAmt(gPending)}</td></tr></tfoot></table>`;
+  h+=`</tbody><tfoot><tr><td>TOTAL</td><td>${gCount}</td><td style="font-family:'Roboto Mono',monospace;text-align:right;">${fmtAmt(gTotal)}</td><td style="font-family:'Roboto Mono',monospace;text-align:right;">${fmtAmt(gVerified)}</td><td style="font-family:'Roboto Mono',monospace;text-align:right;">${fmtAmt(gPending)}</td><td style="text-align:right;">${gBlank||''}</td></tr></tfoot></table>`;
   container.innerHTML=h;
 }
 
 function refreshReport(){
   populateDropdowns();
   const {txns}=getFilteredEntries();
-  const verifiedTxns=txns.filter(t=>creditedMap[t.id]);
-  const pendingTxns=txns.filter(t=>!creditedMap[t.id]);
-  const totalAmt=txns.reduce((s,t)=>s+t.amount,0);
+  const realTxns=txns.filter(t=>!isBlankTxn(t));
+  const verifiedTxns=realTxns.filter(t=>creditedMap[t.id]);
+  const pendingTxns=realTxns.filter(t=>!creditedMap[t.id]);
+  const totalAmt=realTxns.reduce((s,t)=>s+t.amount,0);
   const verifiedAmt=verifiedTxns.reduce((s,t)=>s+t.amount,0);
   const pendingAmt=pendingTxns.reduce((s,t)=>s+t.amount,0);
   document.getElementById('rt-total').textContent=fmtAmt(totalAmt);
@@ -1399,13 +1435,14 @@ function refreshReport(){
   if(!sorted.length){tbl.innerHTML='<div class="empty"><div class="ico">📊</div><p>No data for this period</p></div>';renderTidSummary('rep-tid-summary',[]);return;}
   let h=`<table class="tbl"><thead><tr><th>Date</th><th>TID</th><th>Batch</th><th>Amount</th><th>Status</th></tr></thead><tbody>`;
   sorted.forEach(t=>{
+    const blank=isBlankTxn(t);
     const v=creditedMap[t.id];
-    const statusCell=v?'<span style="color:#059669;font-weight:700;font-size:11px;">✅ Verified</span>':'<span style="color:#F59E0B;font-weight:700;font-size:11px;">⏳ Pending</span>';
+    const statusCell=blank?'<span style="color:#9A3412;font-weight:700;font-size:11px;">🚫 Blank</span>':(v?'<span style="color:#059669;font-weight:700;font-size:11px;">✅ Verified</span>':'<span style="color:#F59E0B;font-weight:700;font-size:11px;">⏳ Pending</span>');
     h+=`<tr>
       <td style="white-space:nowrap;">${fmtDate(t.date)}</td>
       <td style="font-family:'Roboto Mono',monospace;font-size:11px;">${t.tid||'—'}</td>
       <td style="font-family:'Roboto Mono',monospace;font-weight:700;">#${t.batch}</td>
-      <td style="font-family:'Roboto Mono',monospace;font-weight:700;">${fmtAmt(t.amount)}</td>
+      <td style="font-family:'Roboto Mono',monospace;font-weight:700;">${blank?'—':fmtAmt(t.amount)}</td>
       <td>${statusCell}</td>
     </tr>`;
   });
@@ -1423,12 +1460,13 @@ function generateLedger(){
   if(!from||!to)return toast('Select date range','err');
   if(from>to)return toast('From date must be before To date','err');
 
-  let txns=db.transactions.filter(t=>t.date>=from&&t.date<=to);
+  let txns=db.transactions.filter(t=>t.date>=from&&t.date<=to&&isFleetCardTxn(t));
   if(tid!=='ALL')txns=txns.filter(t=>t.tid===tid);
   txns=[...txns].sort((a,b)=>a.date.localeCompare(b.date)||(a.createdAt||'').localeCompare(b.createdAt||''));
 
-  const verifiedTxns=txns.filter(t=>creditedMap[t.id]);
-  const pendingTxns=txns.filter(t=>!creditedMap[t.id]);
+  const realTxns=txns.filter(t=>!isBlankTxn(t));
+  const verifiedTxns=realTxns.filter(t=>creditedMap[t.id]);
+  const pendingTxns=realTxns.filter(t=>!creditedMap[t.id]);
   const verifiedAmt=verifiedTxns.reduce((s,t)=>s+t.amount,0);
   const pendingAmt=pendingTxns.reduce((s,t)=>s+t.amount,0);
 
@@ -1441,13 +1479,14 @@ function generateLedger(){
     rows='<div class="empty"><div class="ico">📒</div><p>No entries for this period</p></div>';
   } else {
     txns.forEach(t=>{
+      const blank=isBlankTxn(t);
       const v=creditedMap[t.id];
-      const statusHtml=v?'<span title="Verified" style="color:var(--green);font-weight:700;">✅</span>':'<span title="Pending" style="color:var(--accent);font-weight:700;">⏳</span>';
-      rows+=`<div class="ledger-row" style="grid-template-columns:52px 68px 44px 1fr 28px;column-gap:4px;">
+      const statusHtml=blank?'<span title="Blank Batch" style="color:#9A3412;font-weight:700;">🚫</span>':(v?'<span title="Verified" style="color:var(--green);font-weight:700;">✅</span>':'<span title="Pending" style="color:var(--accent);font-weight:700;">⏳</span>');
+      rows+=`<div class="ledger-row" style="grid-template-columns:52px 68px 44px 1fr 28px;column-gap:4px;${blank?'opacity:.7;':''}">
         <span class="lr-date" style="font-size:10px;">${fmtDateShort(t.date)}</span>
         <span class="lr-batch" style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.tid||'—'}</span>
         <span class="lr-batch" style="font-size:10px;">#${t.batch}</span>
-        <span class="lr-balance" style="text-align:right;font-size:11px;">${fmtAmt(t.amount)}</span>
+        <span class="lr-balance" style="text-align:right;font-size:11px;">${blank?'—':fmtAmt(t.amount)}</span>
         <span style="text-align:center;">${statusHtml}</span>
       </div>`;
     });
@@ -1534,18 +1573,20 @@ function buildTidSummaryRows(txns){
   const map={};
   txns.forEach(t=>{
     const tid=t.tid||'—';
-    if(!map[tid])map[tid]={count:0,total:0,verified:0,pending:0};
+    if(!map[tid])map[tid]={count:0,total:0,verified:0,pending:0,blank:0};
     map[tid].count++;map[tid].total+=t.amount;
-    if(creditedMap[t.id])map[tid].verified+=t.amount;else map[tid].pending+=t.amount;
+    if(isBlankTxn(t))map[tid].blank++;
+    else if(creditedMap[t.id])map[tid].verified+=t.amount;
+    else map[tid].pending+=t.amount;
   });
-  const rows=[['TID','Entries','Total (₹)','Verified (₹)','Pending (₹)']];
-  let gCount=0,gTotal=0,gVerified=0,gPending=0;
+  const rows=[['TID','Entries','Total (₹)','Verified (₹)','Pending (₹)','Blank Batches']];
+  let gCount=0,gTotal=0,gVerified=0,gPending=0,gBlank=0;
   Object.keys(map).sort().forEach(tid=>{
     const d=map[tid];
-    gCount+=d.count;gTotal+=d.total;gVerified+=d.verified;gPending+=d.pending;
-    rows.push([tid,d.count,d.total,d.verified,d.pending]);
+    gCount+=d.count;gTotal+=d.total;gVerified+=d.verified;gPending+=d.pending;gBlank+=d.blank;
+    rows.push([tid,d.count,d.total,d.verified,d.pending,d.blank]);
   });
-  rows.push([]);rows.push(['TOTAL',gCount,gTotal,gVerified,gPending]);
+  rows.push([]);rows.push(['TOTAL',gCount,gTotal,gVerified,gPending,gBlank]);
   return rows;
 }
 
@@ -1557,14 +1598,14 @@ function exportExcel(){
   let totalAmt=0;
   sorted.forEach(t=>{
     totalAmt+=t.amount;
-    data.push([fmtDate(t.date),t.tid||'—',Number(t.batch),t.amount,creditedMap[t.id]?'Verified':'Pending']);
+    data.push([fmtDate(t.date),t.tid||'—',Number(t.batch),t.amount,isBlankTxn(t)?'Blank':(creditedMap[t.id]?'Verified':'Pending')]);
   });
   data.push([]);data.push(['TOTAL','','',totalAmt,'']);
   const wb=XLSX.utils.book_new();
   const ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=[12,14,10,14,14].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb,ws,'Report');
   const tidWs=XLSX.utils.aoa_to_sheet(buildTidSummaryRows(sorted));
-  tidWs['!cols']=[14,10,14,14,14].map(w=>({wch:w}));
+  tidWs['!cols']=[14,10,14,14,14,14].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb,tidWs,'TID Summary');
   XLSX.writeFile(wb,`FleetCard_Report_${activeFY}_${todayStr()}.xlsx`);
   toast('Excel downloaded!');
@@ -1573,21 +1614,21 @@ function exportExcel(){
 function exportLedgerExcel(){
   const from=document.getElementById('led-from').value,to=document.getElementById('led-to').value;
   const tid=document.getElementById('led-tid').value;
-  let txns=db.transactions.filter(t=>t.date>=from&&t.date<=to);
+  let txns=db.transactions.filter(t=>t.date>=from&&t.date<=to&&isFleetCardTxn(t));
   if(tid!=='ALL')txns=txns.filter(t=>t.tid===tid);
   txns=[...txns].sort((a,b)=>a.date.localeCompare(b.date));
   const data=[['Date','TID','Batch #','Amount (₹)','Status']];
   let totalAmt=0;
   txns.forEach(t=>{
     totalAmt+=t.amount;
-    data.push([fmtDate(t.date),t.tid||'—',Number(t.batch),t.amount,creditedMap[t.id]?'Verified':'Pending']);
+    data.push([fmtDate(t.date),t.tid||'—',Number(t.batch),t.amount,isBlankTxn(t)?'Blank':(creditedMap[t.id]?'Verified':'Pending')]);
   });
   data.push([]);data.push(['TOTAL','','',totalAmt,'']);
   const wb=XLSX.utils.book_new();
   const ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=[12,14,10,14,14].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb,ws,'Ledger');
   const tidWs=XLSX.utils.aoa_to_sheet(buildTidSummaryRows(txns));
-  tidWs['!cols']=[14,10,14,14,14].map(w=>({wch:w}));
+  tidWs['!cols']=[14,10,14,14,14,14].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb,tidWs,'TID Summary');
   XLSX.writeFile(wb,`FleetCard_Ledger_${from}_to_${to}.xlsx`);
   toast('Ledger Excel downloaded!');
@@ -1598,32 +1639,38 @@ function buildTidSummaryHTML(txns){
   const map={};
   txns.forEach(t=>{
     const tid=t.tid||'—';
-    if(!map[tid])map[tid]={count:0,total:0,verified:0,pending:0};
+    if(!map[tid])map[tid]={count:0,total:0,verified:0,pending:0,blank:0};
     map[tid].count++;map[tid].total+=t.amount;
-    if(creditedMap[t.id])map[tid].verified+=t.amount;else map[tid].pending+=t.amount;
+    if(isBlankTxn(t))map[tid].blank++;
+    else if(creditedMap[t.id])map[tid].verified+=t.amount;
+    else map[tid].pending+=t.amount;
   });
   const tids=Object.keys(map).sort();
-  let gCount=0,gTotal=0,gVerified=0,gPending=0;
+  let gCount=0,gTotal=0,gVerified=0,gPending=0,gBlank=0;
   let rows=tids.map(tid=>{
-    const d=map[tid];gCount+=d.count;gTotal+=d.total;gVerified+=d.verified;gPending+=d.pending;
-    return`<tr><td>${tid}</td><td>${d.count}</td><td style="font-family:monospace;">₹${d.total.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;color:#059669;">₹${d.verified.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;color:#EA580C;">₹${d.pending.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>`;
+    const d=map[tid];gCount+=d.count;gTotal+=d.total;gVerified+=d.verified;gPending+=d.pending;gBlank+=d.blank;
+    return`<tr><td>${tid}</td><td>${d.count}</td><td style="font-family:monospace;">₹${d.total.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;color:#059669;">₹${d.verified.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;color:#EA580C;">₹${d.pending.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="color:#9A3412;">${d.blank||''}</td></tr>`;
   }).join('');
   return`<h2 style="font-size:14px;margin:18px 0 8px;">🔢 TID-wise Summary</h2>
-  <table><thead><tr><th>TID</th><th>Entries</th><th>Total</th><th>Verified</th><th>Pending</th></tr></thead>
+  <table><thead><tr><th>TID</th><th>Entries</th><th>Total</th><th>Verified</th><th>Pending</th><th>Blank</th></tr></thead>
   <tbody>${rows}</tbody>
-  <tfoot><tr><td>TOTAL</td><td>${gCount}</td><td style="font-family:monospace;">₹${gTotal.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;">₹${gVerified.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;">₹${gPending.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr></tfoot></table>`;
+  <tfoot><tr><td>TOTAL</td><td>${gCount}</td><td style="font-family:monospace;">₹${gTotal.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;">₹${gVerified.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="font-family:monospace;">₹${gPending.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td>${gBlank||''}</td></tr></tfoot></table>`;
 }
 
 function exportPDF(){
   const {txns}=getFilteredEntries();
   if(!txns.length)return toast('No data','err');
   const sorted=[...txns].sort((a,b)=>a.date.localeCompare(b.date));
-  const verifiedAmt=sorted.filter(t=>creditedMap[t.id]).reduce((s,t)=>s+t.amount,0);
-  const pendingAmt=sorted.filter(t=>!creditedMap[t.id]).reduce((s,t)=>s+t.amount,0);
+  const realTxns=sorted.filter(t=>!isBlankTxn(t));
+  const verifiedAmt=realTxns.filter(t=>creditedMap[t.id]).reduce((s,t)=>s+t.amount,0);
+  const pendingAmt=realTxns.filter(t=>!creditedMap[t.id]).reduce((s,t)=>s+t.amount,0);
   const totalAmt=verifiedAmt+pendingAmt;
   let rows='';sorted.forEach(t=>{
+    const blank=isBlankTxn(t);
     const v=creditedMap[t.id];
-    rows+=`<tr><td>${fmtDate(t.date)}</td><td>${t.tid||'—'}</td><td>#${t.batch}</td><td style="font-family:monospace;font-weight:700;">₹${t.amount.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="color:${v?'#059669':'#EA580C'};font-weight:700;">${v?'✅ Verified':'⏳ Pending'}</td></tr>`;
+    const statusHtml=blank?'🚫 Blank':(v?'✅ Verified':'⏳ Pending');
+    const statusColor=blank?'#9A3412':(v?'#059669':'#EA580C');
+    rows+=`<tr><td>${fmtDate(t.date)}</td><td>${t.tid||'—'}</td><td>#${t.batch}</td><td style="font-family:monospace;font-weight:700;">${blank?'—':'₹'+t.amount.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="color:${statusColor};font-weight:700;">${statusHtml}</td></tr>`;
   });
   const _frHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fleet Card Report</title>
   <style>body{font-family:Arial,sans-serif;font-size:12px;padding:24px;}h1{font-size:18px;margin-bottom:4px;}
@@ -1657,19 +1704,23 @@ function buildLedgerHTML(compact){
   const from=document.getElementById('led-from').value,to=document.getElementById('led-to').value;
   if(!from||!to){toast('Select date range first','err');return null;}
   const tid=document.getElementById('led-tid').value;
-  let txns=db.transactions.filter(t=>t.date>=from&&t.date<=to);
+  let txns=db.transactions.filter(t=>t.date>=from&&t.date<=to&&isFleetCardTxn(t));
   if(tid!=='ALL')txns=txns.filter(t=>t.tid===tid);
   txns=[...txns].sort((a,b)=>a.date.localeCompare(b.date));
   const ledgerFY=dateToFY(from)||activeFY;
-  const verifiedAmt=txns.filter(t=>creditedMap[t.id]).reduce((s,t)=>s+t.amount,0);
-  const pendingAmt=txns.filter(t=>!creditedMap[t.id]).reduce((s,t)=>s+t.amount,0);
+  const realTxns=txns.filter(t=>!isBlankTxn(t));
+  const verifiedAmt=realTxns.filter(t=>creditedMap[t.id]).reduce((s,t)=>s+t.amount,0);
+  const pendingAmt=realTxns.filter(t=>!creditedMap[t.id]).reduce((s,t)=>s+t.amount,0);
   const totalAmt=verifiedAmt+pendingAmt;
   // compact: smaller font, tighter rows, landscape
   const fs=compact?'8px':'12px', pad=compact?'3px 5px':'8px 10px', hpad=compact?'4px 5px':'8px 10px';
   let rows='';
   txns.forEach(t=>{
+    const blank=isBlankTxn(t);
     const v=creditedMap[t.id];
-    rows+=`<tr><td>${fmtDate(t.date)}</td><td>${t.tid||'—'}</td><td>#${t.batch}</td><td style="font-family:monospace;font-weight:700;text-align:right;">₹${t.amount.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="color:${v?'#059669':'#EA580C'};font-weight:700;text-align:right;">${v?'✅ Verified':'⏳ Pending'}</td></tr>`;
+    const statusHtml=blank?'🚫 Blank':(v?'✅ Verified':'⏳ Pending');
+    const statusColor=blank?'#9A3412':(v?'#059669':'#EA580C');
+    rows+=`<tr><td>${fmtDate(t.date)}</td><td>${t.tid||'—'}</td><td>#${t.batch}</td><td style="font-family:monospace;font-weight:700;text-align:right;">${blank?'—':'₹'+t.amount.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td style="color:${statusColor};font-weight:700;text-align:right;">${statusHtml}</td></tr>`;
   });
   rows+=`<tr style="background:#F5FAFE;font-weight:700;"><td colspan="3">TOTAL — ${txns.length} entries</td><td style="font-family:monospace;text-align:right;">₹${totalAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td></td></tr>`;
   return {html:`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fleet Card Ledger</title>
@@ -1933,7 +1984,7 @@ setInterval(()=>{if(!document.hidden)loadFromSheet();},3*60*1000);
 
 // ── FLEET DASHBOARD ──────────────────────────────────────────────────────────
 function refreshFleetDash(){
-  const allT=fyTxns();
+  const allT=fyRealTxns();
   const verifiedT=allT.filter(t=>creditedMap[t.id]);
   const pendingT=allT.filter(t=>!creditedMap[t.id]);
   const totalDr=allT.reduce((s,t)=>s+t.amount,0);
@@ -2023,8 +2074,8 @@ async function exportFleetExcel(from,to){
   if(typeof XLSX==='undefined'){
     await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
   }
-  const txns=db.transactions.filter(t=>(!from||t.date>=from)&&(!to||t.date<=to)).sort((a,b)=>a.date.localeCompare(b.date));
-  const recv=db.received.filter(r=>(!from||r.date>=from)&&(!to||r.date<=to));
+  const txns=db.transactions.filter(t=>(!from||t.date>=from)&&(!to||t.date<=to)&&isFleetCardTxn(t)).sort((a,b)=>a.date.localeCompare(b.date));
+  const recv=db.received.filter(r=>(!from||r.date>=from)&&(!to||r.date<=to)&&isFleetCardTxn(r));
   const ob=getOB();
   const rows=[['Date','TID','Customer','Batch','Amount','Verified','Verified At']];
   txns.forEach(t=>rows.push([t.date,t.tid,t.customer,t.batch,t.amount,creditedMap[t.id]?'Yes':'No',creditedMap[t.id]?.creditedAt||'']));
